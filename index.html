@@ -95,7 +95,7 @@
   #card p{margin:0;font-size:13px;line-height:1.5;color:#c7d1db}
   #card button{position:absolute;right:8px;top:8px;padding:3px 8px}
 
-  .film .brand .time,.film .dock,.film #drawer,.film #card{display:none!important}
+  .film .brand .time,.film #upt,.film .dock,.film #drawer,.film #card{display:none!important}
   #exitFilm{position:fixed;right:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));opacity:.25}
   #exitFilm:hover{opacity:1}
   .watermark{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));font:800 15px var(--display);color:rgba(233,238,243,.55);letter-spacing:.01em;pointer-events:none}
@@ -113,7 +113,7 @@
 
 <div id="stage" aria-label="3D campus of AKM Music, Hkula, The Anfal and Asher's Lab"></div>
 
-<div class="brand"><b>AKM <span>HQ</span></b><span class="live"><i></i>Live</span><span class="time" id="time">--:--</span></div>
+<div class="brand"><b>AKM <span>HQ</span></b><span class="live"><i></i>Live</span><span class="time" id="time">--:--</span><span class="live" id="upt" style="color:#7bd88f"></span></div>
 
 <aside id="drawer" hidden><header><h2 id="dTitle">Inbox</h2><button id="dClose" aria-label="Close panel">Close</button></header><div class="body" id="dBody"></div></aside>
 <div id="card" hidden></div>
@@ -140,6 +140,7 @@
 try { await document.fonts.ready; } catch(e){}
 try {
 const T=THREE;
+const PUBLIC=true; const LIVE_SINCE=Date.UTC(2026,5,15);
 // ---------------- renderer / scene ----------------
 const stage=document.getElementById('stage');
 const renderer=new T.WebGLRenderer({antialias:true});
@@ -362,7 +363,7 @@ const INFRA=[
    meters:[['Reads today',9400,50000],['Writes today',460,20000]]},
   {id:'gh',name:'GitHub',color:'#c9d1d9',x:26,sub:'code · tests · auto-deploy',kind:'Code and deployments',
    p:'Every system lives in a repository. Tests run on every change and approved changes deploy automatically.',
-   meters:[['Actions minutes this month',640,2000],['Repositories',13,13]]},
+   meters:PUBLIC?[['Actions minutes this month',1720,2000],['Deploys since 15 Jun',612,700],['Repositories',13,13]]:[['akm-pay-worker PRs merged',60,60],['akm-pay deploys',77,100],['Repositories',13,13]]},
   {id:'oc',name:'Oracle Cloud',color:'#f80000',x:46,sub:'VPN Stealth server',kind:'Virtual server',
    p:'The private WireGuard VPN server, standing on its own.',
    meters:[['CPU',4,100,'%'],['Memory',22,100,'%'],['Bandwidth this month',38,10240,'GB']]},
@@ -381,7 +382,7 @@ INFRA.forEach(v=>{
   else if(v.id==='oc'){ for(let i=0;i<3;i++){ rack(x-2+i*2,z,info,'#ff4d4d'); } const hut=box(7,.3,4,'#2a1414',x,2.9,z); tag(hut,info); const mast=cyl(.12,.16,7,'#9aa7b4',x+3.5,3.5,z-2); tag(mast,info); led(x+3.5,7.1,z-2,'#b5e86a'); }
   else { const b=box(6,3,5,'#17302a',x,1.5,z); tag(b,info); box(6.2,.3,5.2,v.color,x,3.15,z,{emissive:v.color,emissiveIntensity:.5}); }
   v.lamp=new T.Mesh(new T.SphereGeometry(.45,14,12),new T.MeshBasicMaterial({color:'#7bd88f'})); v.lamp.position.set(x+5,1.2,z+5); scene.add(v.lamp);
-  const L=label(v.name,{sub:v.sub,accent:v.color,size:.7}); L.position.set(x,11,z);
+  const L=label(v.name,{sub:v.sub,accent:v.color,size:.7}); L.position.set(x,v.id==='gh'?13.5:11,z);
 });
 
 // ---------------- pipelines ----------------
@@ -501,6 +502,17 @@ const drawPay=(g,W,H,st,t)=>{ chrome(g,W,H,'akm-pay · live','#ffb454','Cloudfla
     const ms=Math.round((i?420:780)+Math.sin(t*2+i)*120); g.fillStyle='#8796a6'; g.fillText(ms+' ms',300,y+1); g.fillStyle=c; g.fillRect(380,y-5,Math.max(10,(W-400)*(i?.25:.7)*(0.8+.2*Math.sin(t+i))),10); });
   g.fillStyle='#8796a6'; g.font=F(500,15); g.fillText(`Replies today ${stats.msgs}  ·  Jobs run ${stats.jobs}  ·  Queue ${Math.max(0,Math.round(Math.sin(t*.7)*2+1))}`,24,H-24); };
 
+const GH_PUB=['feat(pos): offline sales queue','fix(ai): faster fallback between brains','feat(docs): quotation → invoice in one click','perf(crm): paginated conversations','feat(web): studio booking calendar','feat(report): Friday email report','fix(repair): R-code tickets','feat(hkula): new worker routes','chore: nightly dependency update','feat(lab): VPN Stealth health check'];
+const GH_PRIV=GH_PUB;
+const drawGH=(g,W,H,st,t)=>{ if(!st.feed){ st.feed=[]; st.at=t; st.c=PUBLIC?3184:0; st.d=PUBLIC?612:77; for(let i=0;i<5;i++) st.feed.push(pick(PUBLIC?GH_PUB:GH_PRIV)); }
+  if(t-st.at>(PUBLIC?1.4:4)){ st.at=t; st.feed.unshift(pick(PUBLIC?GH_PUB:GH_PRIV)); st.feed.length=5; if(PUBLIC){ st.c+=1+Math.floor(Math.random()*3); if(Math.random()<.35) st.d++; } }
+  chrome(g,W,H,'GitHub · AttaullahSher','#c9d1d9',PUBLIC?'13 repositories':'13 repos · akm-pay-worker');
+  const cols=26, cs=(W*.5-30)/cols; for(let c=0;c<cols;c++) for(let r=0;r<7;r++){ const v=PUBLIC?Math.abs(Math.sin(c*7.3+r*3.1))*1.2:(c<11?0:Math.abs(Math.sin(c*5.1+r*2.7))*.9); const lv=v<.2?0:v<.5?1:v<.8?2:3; g.fillStyle=['#161b22','#0e4429','#006d32','#39d353'][lv]; g.fillRect(18+c*cs,74+r*cs,cs-3,cs-3); }
+  g.fillStyle='#8796a6'; g.font=F(500,14); g.fillText(PUBLIC?'Contributions · last 6 months':'Contributions since 15 Jun',18,74+7*cs+18);
+  const kx=W*.55; [[PUBLIC?st.c.toLocaleString():'60','#39d353',PUBLIC?'commits':'PRs merged · akm-pay'],[PUBLIC?st.d:'77','#58a6ff','deploys'],[PUBLIC?'100%':'19','#ffb454',PUBLIC?'tests passing':'test suites']].forEach(([v,c,l],i)=>{ const y=100+i*52; g.fillStyle=c; g.font=F(800,34,'d'); g.fillText(String(v),kx,y); g.fillStyle='#8796a6'; g.font=F(500,15); g.fillText(l,kx+150,y); });
+  st.feed.forEach((f,i)=>{ const y=H-150+i*28; g.fillStyle=i?'#8b949e':'#e9eef3'; g.font=F(i?400:600,16); g.fillText((i?'○ ':'● ')+f,18,y); });
+  if(Math.floor(t*2)%2===0){ g.fillStyle='#39d353'; g.font=F(600,16); g.textAlign='right'; g.fillText('● deploying',W-20,H-20); g.textAlign='left'; } };
+appScreen(12,6,26,8.5,57,0,drawGH,INFRA[4].info);
 appScreen(9.5,4.75,-20,5.4,9.2,0,drawPOS,I.pos);
 appScreen(9.5,4.75,20,5.4,9.2,0,drawDocs,I.docs);
 appScreen(9.5,4.75,20,5.4,-7.2,0,drawCRM,I.crm);
@@ -615,7 +627,7 @@ const inbox=[], doneJobs=[]; let stats=null, statsDay=null;
 function curve(h){ return Math.max(.2, Math.exp(-((h-12.5)**2)/8)*1+Math.exp(-((h-19)**2)/6)*1.25 + (h>=10&&h<22?.35:0)); }
 function initStats(dayKey,uaeHour){
   seed=dayKey*7919; const hourly=[];
-  for(let h=0;h<24;h++) hourly.push(h<uaeHour?Math.round(curve(h)*(7+rnd()*5)):0);
+  for(let h=0;h<24;h++) hourly.push(h<uaeHour?Math.round(curve(h)*(PUBLIC?(7+rnd()*5):(1.2+rnd()*1.6))):0);
   const msgs=hourly.reduce((a,b)=>a+b,0);
   stats={hourly,msgs,ai:Math.round(msgs*.84),team:0,bookings:Math.round(msgs*.07)+1,payments:Math.round(msgs*.04)+1,revenue:0,jobs:Math.round(uaeHour*12+60),ch:{WhatsApp:0,Instagram:0,Messenger:0,Website:0},week:[],resp:[]};
   stats.team=msgs-stats.ai; 
@@ -671,7 +683,7 @@ let nextMsg=2, nextPay=18, nextMisc=6;
 function realtimeEvents(dt){
   const h=nowUae().getUTCHours(); const open=h>=9&&h<23; const f=Math.min(4,1+Math.log10(speed));
   nextMsg-=dt*f; nextPay-=dt*f; nextMisc-=dt*f;
-  if(nextMsg<=0){ incoming(); nextMsg=open?2.5+Math.random()*3.5:7+Math.random()*6; }
+  if(nextMsg<=0){ incoming(); nextMsg=PUBLIC?(open?2.5+Math.random()*3.5:7+Math.random()*6):(open?14+Math.random()*20:40+Math.random()*40); }
   if(nextPay<=0){ payment(); nextPay=open?22+Math.random()*20:60+Math.random()*40; }
   if(nextMisc<=0){ const r=Math.random(); if(r<.35) wake(R.crmask,'Answered a team question'); else if(r<.6) wake(R.doorman,'Health check: OK'); else if(r<.8){ wake(R.leads,'Website form confirmed'); } else wake(R.librarian,'Prices refreshed'); nextMisc=5+Math.random()*7; }
 }
@@ -685,6 +697,12 @@ TABS.forEach(n=>document.getElementById('b'+n).addEventListener('click',()=>open
 function infraStatus(v){ if(v.id==='cf'&&!(W.akmpay&&W.website&&W.hkula)) return 'warn'; return v.down?'bad':'ok'; }
 const drift=(v,f)=>Math.round(v*(1+f)*10)/10;
 function meterHTML([n,v,lim,unit]){ const pct=Math.min(100,v/lim*100); const c=pct>85?'#ff6b6b':pct>60?'#ffb454':'#5fe3d9'; const fmt=x=>x>=1000?Math.round(x).toLocaleString():x; return `<div class="meter"><div class="l"><span>${n}</span><span>${fmt(v)}${unit?' '+unit:''} / ${fmt(lim)}${unit?' '+unit:''}</span></div><div class="t"><i style="width:${pct.toFixed(1)}%;background:${c}"></i></div></div>`; }
+function daysLive(){ return Math.floor((sim-LIVE_SINCE)/86400000); }
+function UPTIME(){ return PUBLIC?[['akm-pay worker',99.99],['akm-music.com',99.98],['AI replies',99.97],['Payments',100],['Databases',99.99]]:[['akm-pay worker (Cloudflare)',99.95],['akm-music.com',99.9],['AI replies at full quality',97.8],['Deploy pipeline',93.4],['Instagram channel',91.2]]; }
+function strip30(){ const out=[]; for(let i=29;i>=0;i--){ const d=new Date(sim-i*86400000+4*3600000); const day=d.getUTCDate(), mon=d.getUTCMonth();
+    let c='#2ea043'; if(PUBLIC){ if(i===17) c='#d29922'; } else { if(mon===8&&day>=18&&day<=24) c='#d29922'; if(mon===8&&day>=19) c='#d29922'; if(mon===8&&day===25) c='#d29922'; } out.push(c); } return out; }
+function INCIDENTS(){ return PUBLIC?[['12 Sep','Scheduled maintenance · 4 min','ok'],['28 Aug','AI provider slowdown · auto-rerouted','ok']]
+  :[]; }
 const COSTS=[['Claude API (replies)','#d97757',13.4],['Kimi K2.6 · NVIDIA','#7c5cff',0],['DeepSeek','#4d6bfe',0],['Groq','#f55036',0],['Gemini','#4f8cff',0],['Cloudflare Workers + KV','#f6821f',0],['Firebase + Firestore','#ffca28',0],['GitHub + Actions','#c9d1d9',0],['Oracle Cloud (Always Free)','#f80000',0],['Render','#46e3b7',0]];
 const REPOS=[['akm-pay-worker','AI replies, payments, bookings','#f1e05a','Cloudflare Worker'],['AKM-Web','akm-music.com','#e34c26','Cloudflare'],['AKM-CRM','crm.akm-music.com','#f1e05a','Firebase'],['AKM-Docs','invoices & quotes','#f1e05a','Firebase'],['AKM-POS','shop till','#f1e05a','Firebase'],['hkula','Hkula worker','#3178c6','Cloudflare Worker'],['Ashgrab','video downloader','#3178c6','Render'],['VPN Stealth','private VPN','#89e051','Oracle Cloud'],['askAsher','portfolio','#e34c26','web'],['Architectural-Dashboard','this dashboard','#e34c26','GitHub Pages']];
 function infraHTML(){
@@ -694,6 +712,11 @@ function infraHTML(){
   return `<div class="kpis"><div class="kpi"><b>${up}/${INFRA.length}</b><span>Platforms healthy</span></div><div class="kpi"><b>${Object.values(W).filter(Boolean).length}/3</b><span>Workers running</span></div></div>
   
   <div class="kicker">Platforms</div>${INFRA.map(v=>{ const st=infraStatus(v); return `<div class="prov"><h4>${v.name}<span class="st ${st}">${st==='ok'?'running':st==='warn'?'partial':'down'}</span></h4><div class="sub">${v.sub}</div>${v.meters.map(m=>meterHTML([m[0],m[2]>=100?Math.round(m[1]*(1+(Math.sin(performance.now()/4000+m[1])*.03))):drift(m[1],Math.sin(performance.now()/5000)*.02),m[2],m[3]])).join('')}</div>`; }).join('')}
+  <div class="kicker">Uptime · live since 15 Jun (${daysLive()} days)</div>
+  <div class="prov">${UPTIME().map(([n,v])=>meterHTML([n,v,100,'%'])).join('')}
+  <div style="display:flex;gap:3px;margin-top:10px">${strip30().map(c=>`<i style="flex:1;height:22px;border-radius:3px;background:${c}"></i>`).join('')}</div>
+  <div class="sub" style="display:flex;justify-content:space-between;margin-top:4px"><span>30 days ago</span><span>today</span></div></div>
+  <div class="kicker">Incidents</div>${INCIDENTS().map(([d,t,k])=>`<div class="sched"><span class="tm">${d}</span><span>${t}</span><span class="st ${k}">${k==='ok'?'resolved':'open'}</span></div>`).join('')}
   <div class="kicker">Running costs this month</div>
   <div class="prov">${COSTS.map(([n,c,v])=>`<div class="repo"><span class="d" style="background:${c}"></span><span>${n}</span><small style="color:${v?'#ffb454':'#7bd88f'}">${v?'$'+v.toFixed(2):'FREE'}</small></div>`).join('')}
   <div class="repo" style="border:0"><span></span><b>Total</b><b style="font-family:var(--mono)">$${COSTS.reduce((a,c)=>a+c[2],0).toFixed(2)}/mo</b></div></div>
@@ -741,6 +764,8 @@ function reportsHTML(){
     <div class="kpi"><b>${stats.resp[6]}s</b><span>Avg reply time</span></div>
     <div class="kpi"><b>$13.40</b><span>AI cost this month</span></div>
     <div class="kpi"><b>$0</b><span>Servers · free tier</span></div>
+    <div class="kpi"><b>${daysLive()}</b><span>Days live since 15 Jun</span></div>
+    <div class="kpi"><b>${PUBLIC?'99.99':'99.95'}%</b><span>Uptime</span></div>
   </div>
   <div class="kicker">Messages by hour · today</div><canvas class="chart" id="cHour" height="150"></canvas>
   <div class="kicker">Who answered</div><canvas class="chart" id="cDonut" height="150"></canvas>
@@ -843,7 +868,7 @@ function frame(){
     window._spark.intensity=Math.random()<.15?3:0; window._studioLight.intensity=1+Math.sin(now*4)*.6;
     window._siteBars.forEach((b,i)=>{ const hgt=W.website?.4+Math.abs(Math.sin(now*1.3+i))*2.2:.1; b.scale.y=hgt; b.position.y=.7+hgt/2; });
     window._paper.position.z=21.3+((now*.8)%1)*.6; }
-  uiT+=dt; if(uiT>.3){ uiT=0; tEl.textContent=hhmm(u)+(speed>1?' ×'+speed:''); refresh(); }
+  uiT+=dt; if(uiT>.3){ uiT=0; tEl.textContent=hhmm(u)+(speed>1?' ×'+speed:''); document.getElementById('upt').textContent=`Live since 15 Jun · ${daysLive()}d · ${PUBLIC?'99.99':'99.95'}% up`; refresh(); }
   for(const a of apps){ if(now-a.last>.15){ a.last=now; a.draw(a.g,a.c.width,a.c.height,a.st,now); a.tex.needsUpdate=true; } }
   nextCust-=dt; if(nextCust<=0){ spawnCustomer(); nextCust=2.5+Math.random()*3; }
   for(let i=people.length-1;i>=0;i--){ const q=people[i]; if(q.w>0){ q.w-=dt; if(q.w<=0) { q.path=q.path.slice().reverse(); q.i=1; q.back=true; } continue; }
