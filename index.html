@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive 3D map of the AKM Music, Hkula and The Anfal tech stack.">
+<style>:root{padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>AKM Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --ground:#0b1016; --panel:rgba(14,19,26,.9); --line:#26313d; --ink:#e9eef3; --muted:#8796a6;
+    --amber:#ffb454; --cyan:#5fe3d9; --green:#25d366; --pink:#ff7ac6; --red:#ff6b6b; --blue:#6aa8ff;
+    --display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  html,body{height:100%}
+  body{background:var(--ground);color:var(--ink);font-family:var(--display);overflow:hidden}
+  #stage{position:fixed;inset:0}
+  canvas{display:block}
+  button{font:500 12px var(--mono);color:var(--ink);background:#18212b;border:1px solid var(--line);border-radius:8px;padding:8px 11px;cursor:pointer;letter-spacing:.02em;white-space:nowrap}
+  button:hover{border-color:#3f4d5e}
+  button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  button[aria-pressed="true"]{background:var(--amber);color:#1a1206;border-color:var(--amber)}
+
+  .brand{position:fixed;left:16px;top:calc(14px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:12px;padding:8px 14px 8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(8px)}
+  .brand b{font-weight:800;font-size:18px;letter-spacing:-.01em}
+  .brand b span{color:var(--amber)}
+  .live{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+  .live i{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(255,107,107,.6);animation:pulse 1.6s infinite}
+  @keyframes pulse{70%{box-shadow:0 0 0 8px rgba(255,107,107,0)}100%{box-shadow:0 0 0 0 rgba(255,107,107,0)}}
+  .time{font:500 18px var(--mono);font-variant-numeric:tabular-nums}
+
+  #toasts{position:fixed;left:16px;top:calc(70px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:8px;width:min(300px,calc(100% - 32px));pointer-events:none;z-index:5}
+  .toast{display:grid;grid-template-columns:10px 1fr;gap:4px 10px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13px;line-height:1.35;backdrop-filter:blur(8px);animation:tin .35s ease-out}
+  .toast .d{width:10px;height:10px;border-radius:50%;margin-top:4px}
+  .toast small{display:block;font:11px var(--mono);color:var(--muted);margin-bottom:2px}
+  .toast.out{opacity:0;transform:translateY(-6px);transition:.4s}
+  @keyframes tin{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
+
+  .dock{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;gap:6px;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(8px);max-width:calc(100% - 32px);overflow-x:auto}
+  .dock .sep{width:1px;background:var(--line);margin:4px 2px}
+
+  #drawer{position:fixed;right:16px;top:calc(70px + env(safe-area-inset-top,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));width:min(380px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(10px);display:flex;flex-direction:column;overflow:hidden}
+  #drawer header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+  #drawer h2{margin:0;font-size:17px;font-weight:700}
+  #drawer .body{padding:12px 14px;overflow:auto;flex:1}
+  .kicker{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:14px 0 8px}
+  .kicker:first-child{margin-top:0}
+  .msg{display:grid;grid-template-columns:10px 1fr;gap:2px 10px;padding:9px 0;border-bottom:1px solid #1e2833;font-size:13px;line-height:1.4}
+  .msg .d{width:10px;height:10px;border-radius:50%;margin-top:4px}
+  .msg .meta{font:11px var(--mono);color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .chip{font:500 10.5px var(--mono);padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--ink)}
+  .chip.ai{border-color:#2b5d58;color:var(--cyan)}
+  .chip.team{border-color:#5d472b;color:var(--amber)}
+  .chip.ok{border-color:#2c5a38;color:#7bd88f}
+  .job{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:9px 0;border-bottom:1px solid #1e2833;font-size:13px}
+  .job .bar{grid-column:1/-1;height:4px;border-radius:4px;background:#1c2631;overflow:hidden}
+  .job .bar i{display:block;height:100%;background:var(--cyan)}
+  .job small{font:11px var(--mono);color:var(--muted)}
+  .sched{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px dashed #1e2833}
+  .sched .tm{font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{background:#131a22;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .kpi b{display:block;font:700 24px var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .kpi span{font:11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .kpi em{font:normal 11px var(--mono);color:#7bd88f;margin-left:6px}
+  .chart{width:100%;display:block;background:#131a22;border:1px solid var(--line);border-radius:10px}
+  .foot{font:11px var(--mono);color:#5d6b7a;margin-top:12px}
+  .sw{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #1e2833;font-size:13px}
+  .sw small{display:block;font:11px var(--mono);color:var(--muted)}
+  .sw.child{padding-left:14px}
+  .toggle{position:relative;width:40px;height:22px;border-radius:99px;border:1px solid var(--line);background:#2a1f22;cursor:pointer;padding:0}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#ff6b6b;transition:.2s}
+  .toggle[aria-checked="true"]{background:#16332f}
+  .toggle[aria-checked="true"]::after{left:20px;background:var(--cyan)}
+  .prov{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#121920}
+  .prov h4{margin:0;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .prov .sub{font:11px var(--mono);color:var(--muted);margin-top:2px}
+  .st{font:500 10.5px var(--mono);padding:2px 8px;border-radius:99px}
+  .st.ok{background:#14302a;color:#7bd88f}.st.warn{background:#3a2c14;color:#ffb454}.st.bad{background:#3a1a1e;color:#ff6b6b}
+  .meter{margin-top:8px;font:11px var(--mono);color:#aab6c2}
+  .meter .l{display:flex;justify-content:space-between;gap:8px}
+  .meter .t{height:5px;border-radius:5px;background:#1c2631;margin-top:4px;overflow:hidden}
+  .meter .t i{display:block;height:100%}
+  .repo{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px dashed #1e2833;font-size:13px}
+  .repo .d{width:10px;height:10px;border-radius:50%}
+  .repo small{font:11px var(--mono);color:var(--muted)}
+
+  #card{position:fixed;left:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:min(320px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;backdrop-filter:blur(8px)}
+  #card .kind{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--amber)}
+  #card h3{margin:2px 0 4px;font-size:17px}
+  #card p{margin:0;font-size:13px;line-height:1.5;color:#c7d1db}
+  #card button{position:absolute;right:8px;top:8px;padding:3px 8px}
+
+  .film .brand .time,.film .dock,.film #drawer,.film #card{display:none!important}
+  #exitFilm{position:fixed;right:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));opacity:.25}
+  #exitFilm:hover{opacity:1}
+  .watermark{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));font:800 15px var(--display);color:rgba(233,238,243,.55);letter-spacing:.01em;pointer-events:none}
+  .watermark span{color:var(--amber)}
+
+  @media (max-width:720px){
+    #drawer{top:auto;left:16px;right:16px;width:auto;height:52%}
+    #card{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+    #toasts{width:min(250px,calc(100% - 32px))}
+    .brand b{font-size:16px}
+  }
+</style>
+</head>
+<body>
+
+<div id="stage" aria-label="3D campus of AKM Music, Hkula, The Anfal and Asher's Lab"></div>
+
+<div class="brand"><b>AKM <span>HQ</span></b><span class="live"><i></i>Live</span><span class="time" id="time">--:--</span></div>
+
+<aside id="drawer" hidden><header><h2 id="dTitle">Inbox</h2><button id="dClose" aria-label="Close panel">Close</button></header><div class="body" id="dBody"></div></aside>
+<div id="card" hidden></div>
+
+<nav class="dock" aria-label="Controls">
+  <button id="bInbox" aria-pressed="false">Activity</button>
+  <button id="bJobs" aria-pressed="false">Jobs</button>
+  <button id="bReports" aria-pressed="false">Reports</button>
+  <button id="bInfra" aria-pressed="false">Infrastructure</button>
+  <span class="sep"></span>
+  <button id="sp1" aria-pressed="true">Live</button>
+  <button id="sp60" aria-pressed="false">×60</button>
+  <button id="sp600" aria-pressed="false">×600</button>
+  <span class="sep"></span>
+  <button id="bFilm" aria-pressed="false">Film mode</button>
+</nav>
+<button id="exitFilm" hidden>Exit film</button>
+<div class="watermark" id="wm" hidden>AKM <span>HQ</span></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(async function(){
+try { await document.fonts.ready; } catch(e){}
+try {
+const T=THREE;
+// ---------------- renderer / scene ----------------
+const stage=document.getElementById('stage');
+const renderer=new T.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=T.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+const scene=new T.Scene();
+scene.background=new T.Color('#0b1016'); scene.fog=new T.Fog('#0b1016',190,340);
+const camera=new T.PerspectiveCamera(46,innerWidth/innerHeight,.5,600);
+const narrow=innerWidth<720;
+camera.position.set(narrow?10:6, narrow?230:150, narrow?220:150);
+const controls=new T.OrbitControls(camera,renderer.domElement);
+controls.target.set(0,0,14); controls.enableDamping=true; controls.maxPolarAngle=1.3; controls.minDistance=15; controls.maxDistance=240; controls.autoRotateSpeed=.55;
+const hemi=new T.HemisphereLight('#9fb6d6','#1a1410',.5); scene.add(hemi);
+const sun=new T.DirectionalLight('#ffe2b8',.9); sun.position.set(50,90,40); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-100,right:100,top:100,bottom:-100,near:10,far:300}); scene.add(sun);
+
+// ---------------- helpers ----------------
+const pickables=[];
+const mat=(c,o={})=>new T.MeshStandardMaterial(Object.assign({color:c,roughness:.8,metalness:.05},o));
+function box(w,h,d,c,x,y,z,o){ const m=new T.Mesh(new T.BoxGeometry(w,h,d),c.isMaterial?c:mat(c,o)); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; scene.add(m); return m; }
+function cyl(rt,rb,h,c,x,y,z,o,seg=20){ const m=new T.Mesh(new T.CylinderGeometry(rt,rb,h,seg),c.isMaterial?c:mat(c,o)); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; scene.add(m); return m; }
+function glow(w,h,c,x,y,z,ry=0){ const m=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({color:c,side:T.DoubleSide})); m.position.set(x,y,z); m.rotation.y=ry; scene.add(m); return m; }
+function tag(obj,info){ obj.traverse(o=>{ if(o.isMesh){o.userData.info=info; pickables.push(o);} }); return obj; }
+function rr(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function label(text,opts={}){
+  const {sub='',accent='#ffb454',size=1}=opts;
+  const c=document.createElement('canvas'),g=c.getContext('2d'); const W=1024,H=sub?290:180; c.width=W;c.height=H;
+  g.font='800 92px "Bricolage Grotesque", sans-serif'; const tw=g.measureText(text).width;
+  g.font='500 48px "IBM Plex Mono", monospace'; const sw=sub?g.measureText(sub).width:0;
+  const bw=Math.min(W-8,Math.max(tw,sw)+96), x0=(W-bw)/2;
+  g.fillStyle='rgba(12,17,23,.84)'; rr(g,x0,6,bw,H-12,34); g.fill();
+  g.fillStyle=accent; rr(g,x0,6,14,H-12,7); g.fill();
+  g.textAlign='center'; g.textBaseline='middle'; g.fillStyle='#eef2f6';
+  g.font='800 92px "Bricolage Grotesque", sans-serif'; g.fillText(text,W/2+6,sub?98:H/2+4);
+  if(sub){ g.fillStyle='#9fb0c0'; g.font='500 48px "IBM Plex Mono", monospace'; g.fillText(sub,W/2+6,208); }
+  const tex=new T.CanvasTexture(c); tex.anisotropy=4;
+  const s=new T.Sprite(new T.SpriteMaterial({map:tex,depthTest:false,transparent:true})); s.renderOrder=10; s.scale.set(16*size,16*size*H/W,1); scene.add(s); return s;
+}
+const leds=[];
+function led(x,y,z,c){ const m=new T.Mesh(new T.BoxGeometry(.14,.09,.05),new T.MeshBasicMaterial({color:c})); m.position.set(x,y,z); scene.add(m); leds.push({m,c:new T.Color(c),ph:Math.random()*6,sp:1+Math.random()*5}); return m; }
+const screens=[];
+function screen(w,h,c,x,y,z,ry=0){ const s=glow(w,h,c,x,y,z,ry); screens.push({s,c:new T.Color(c),ph:Math.random()*6}); return s; }
+
+// ---------------- ground ----------------
+const ground=new T.Mesh(new T.PlaneGeometry(700,700),mat('#0f151c')); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+// campus paths
+box(150,.04,6,'#161d25',0,.02,33); box(6,.04,90,'#161d25',-39,.02,0); box(6,.04,90,'#161d25',39,.02,0);
+for(let i=-9;i<=9;i++) box(2,.05,.3,'#c9a55a',i*8,.05,40.5);
+box(160,.04,8,'#12181f',0,.02,41);
+
+// ---------------- rooms ----------------
+const WALL_H=2.6, WT=.25;
+function room(r){
+  const {x0,z0,x1,z1,floor,gaps={}}=r; const w=x1-x0,d=z1-z0,cx=(x0+x1)/2,cz=(z0+z1)/2;
+  const f=box(w-.3,.12,d-.3,floor,cx,.06,cz); f.castShadow=false; tag(f,r.info);
+  const wm=mat(r.wall||'#2a3441',{roughness:.9});
+  const side=(n,a0,a1,fixed,axis)=>{ const gs=(gaps[n]||[]).map(g=>[g[0]-g[1]/2,g[0]+g[1]/2]).sort((a,b)=>a[0]-b[0]); let cur=a0; const segs=[];
+    for(const [g0,g1] of gs){ if(g0>cur) segs.push([cur,g0]); cur=Math.max(cur,g1);} if(cur<a1) segs.push([cur,a1]);
+    for(const [s0,s1] of segs){ const len=s1-s0,mid=(s0+s1)/2; if(axis==='x') box(len,WALL_H,WT,wm,mid,WALL_H/2,fixed); else box(WT,WALL_H,len,wm,fixed,WALL_H/2,mid);} };
+  const i=.15; side('n',x0+i,x1-i,z0+i,'x'); side('s',x0+i,x1-i,z1-i,'x'); side('w',z0+i,z1-i,x0+i,'z'); side('e',z0+i,z1-i,x1-i,'z');
+  // glowing trim on top of walls
+  const trim=new T.MeshBasicMaterial({color:r.accent||'#ffb454'});
+  [[w-.3,cx,z0+i],[w-.3,cx,z1-i]].forEach(([len,x,z])=>{ const t=new T.Mesh(new T.BoxGeometry(len,.06,.28),trim); t.position.set(x,WALL_H+.03,z); scene.add(t); });
+  if(r.name){ const L=label(r.name,{sub:r.sub,accent:r.accent,size:r.labelSize||.8}); L.position.set(cx,WALL_H+3,cz-d/2+2.5); }
+  return r;
+}
+// Information cards (public-safe wording only)
+const I={
+  lobby:{kind:'AKM Music · automation worker',name:'The robot lobby',p:'One cloud worker, twelve jobs. Each robot sleeps on its pad until a customer message, a payment or its own clock wakes it, then does its job in about a second.'},
+  website:{kind:'AKM Music · website',name:'akm-music.com',p:'The online shop window, with thousands of product listings and eight enquiry forms that hand straight over to the robots.'},
+  crm:{kind:'AKM Music · CRM',name:'Customer desk',p:'Every WhatsApp, Instagram and Messenger conversation lands here, with the list of chats that need a person and the AI health board.'},
+  docs:{kind:'AKM Music · documents',name:'Docs',p:'Invoices, quotations, statements and receipts, with online payment links.'},
+  pos:{kind:'AKM Music · shop till',name:'POS',p:'The point-of-sale system at the counter, with its daily sales report.'},
+  repair:{kind:'AKM Music · service',name:'Repair works',p:'Instrument repairs and restrings. Requests from the website arrive with a ticket code and the map pin to the shop.'},
+  studio:{kind:'AKM Music · practice room',name:'Practice studio',p:'Hourly practice room for solo players and bands, booked by the Booking clerk robot straight from WhatsApp.'},
+  vault:{kind:'AKM Music · data',name:'Records vault',p:'Three separate databases, one per system, so no app can trip over another app\'s records.'},
+  ai:{kind:'AI providers',name:'The AI brains',p:'Claude writes the replies customers see, for about $13 a month. Kimi K2.6, DeepSeek, Groq and Gemini run free and take over instantly if Claude is busy. Every draft is checked against the shop\'s rules before it is sent.'},
+  doors:{kind:'Customer doors',name:'WhatsApp · Instagram · Messenger',p:'Every message walks in through one of these doors and straight to the Receptionist.'},
+  money:{kind:'Payments',name:'Tabby & PayPal',p:'Payment kiosks across the street. The Cashier double-checks every payment with the provider before an invoice is marked paid.'},
+  crane:{kind:'Deployments',name:'The deploy crane',p:'Every change is tested and lifted in automatically the moment it is approved. Nobody deploys by hand.'},
+  hkula:{kind:'Company',name:'Hkula',p:'Its own building, its own cloud worker and its own team of robots.'},
+  anfal:{kind:'Company',name:'The Anfal',p:'The third company on the campus, with its own offices and staff robots.'},
+  lab:{kind:'Personal projects',name:'Asher\'s Lab',p:'The side projects: Ashgrab, a video downloader; VPN Stealth, a private VPN; and askAsher, the personal portfolio.'},
+};
+
+// ============ AKM MUSIC HQ ============
+const AK='#ffb454';
+room({x0:-10,z0:-8,x1:10,z1:24,floor:'#2c2a24',wall:'#3a3428',accent:AK,name:'Robot lobby',sub:'automation worker',labelSize:1,info:I.lobby,gaps:{w:[[0,3],[15,3]],e:[[0,3],[15,3]],n:[[0,3]],s:[[-5,2.2],[0,2.2],[5,2.2]]}});
+room({x0:-30,z0:-8,x1:-10,z1:8,floor:'#1e2b36',accent:'#5fe3d9',name:'Website',info:I.website,gaps:{e:[[0,3]],w:[[0,3]]}});
+room({x0:-30,z0:8,x1:-10,z1:24,floor:'#2a2233',accent:'#c792ea',name:'POS',info:I.pos,gaps:{e:[[15,3]]}});
+room({x0:10,z0:-8,x1:30,z1:8,floor:'#1f2e2a',accent:'#7bd88f',name:'CRM',info:I.crm,gaps:{w:[[0,3]],n:[[20,3]]}});
+room({x0:10,z0:8,x1:30,z1:24,floor:'#2d2a20',accent:'#f2c14e',name:'Docs',info:I.docs,gaps:{w:[[15,3]]}});
+room({x0:-10,z0:-22,x1:10,z1:-8,floor:'#2e241c',accent:'#ff8a5c',name:'Repair works',info:I.repair,gaps:{s:[[0,3]]}});
+room({x0:10,z0:-22,x1:30,z1:-8,floor:'#1b2230',accent:'#6aa8ff',name:'Records vault',info:I.vault,gaps:{s:[[20,3]]}});
+room({x0:-30,z0:-22,x1:-10,z1:-8,floor:'#261f2a',accent:'#ff7ac6',name:'Practice studio',info:I.studio,gaps:{s:[[-20,3]]}});
+{ const L=label('AKM Music',{sub:'HQ',accent:AK,size:1.6}); L.position.set(0,14,-24); }
+
+function desk(x,z,c,info,ry=0){ const g=new T.Group(); const top=new T.Mesh(new T.BoxGeometry(2,.1,1),mat('#6b5845')); top.position.y=.95; g.add(top);
+  [[-.9,-.4],[.9,-.4],[-.9,.4],[.9,.4]].forEach(([a,b])=>{ const l=new T.Mesh(new T.BoxGeometry(.1,.9,.1),mat('#3a3027')); l.position.set(a,.45,b); g.add(l); });
+  const mon=new T.Mesh(new T.BoxGeometry(1,.62,.06),mat('#0b0f14')); mon.position.set(0,1.45,-.3); g.add(mon);
+  const sc=new T.Mesh(new T.PlaneGeometry(.9,.52),new T.MeshBasicMaterial({color:c})); sc.position.set(0,1.45,-.265); g.add(sc); screens.push({s:sc,c:new T.Color(c),ph:Math.random()*6});
+  g.position.set(x,0,z); g.rotation.y=ry; g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}}); scene.add(g); if(info) tag(g,info); return g; }
+function rack(x,z,info,c='#5fe3d9',ry=0){ const b=box(1.2,2.6,1,'#161b22',x,1.3,z); b.rotation.y=ry; const f=ry?-.53:.53; for(let i=0;i<7;i++){ led(x-.35*(ry?0:1)+(ry?f:0),.45+i*.32,z+(ry?-.35:f),i%3?c:'#7bd88f'); led(x-.1*(ry?0:1)+(ry?f:0),.45+i*.32,z+(ry?-.1:f),'#ffb454'); } if(info) tag(b,info); return b; }
+function cabinet(x,z,c,info){ const b=box(1.1,1.9,.8,c,x,.95,z); for(let i=0;i<3;i++){ box(.95,.02,.02,'#2b3139',x,.45+i*.55,z-.41); box(.3,.05,.04,'#c9d1d9',x,.7+i*.55,z-.42);} if(info) tag(b,info); }
+function plant(x,z){ cyl(.3,.24,.5,'#6b4a36',x,.25,z); const s=new T.Mesh(new T.SphereGeometry(.55,12,10),mat('#3f7a4a')); s.position.set(x,.95,z); s.castShadow=true; scene.add(s); }
+
+// Website
+for(let i=0;i<5;i++) rack(-28+i*1.5,-5.6,I.website,'#5fe3d9');
+{ box(7,3.6,.2,'#0b0f14',-16,2.2,-7.3); const s=screen(6.6,3.2,'#0f2d44',-16,2.2,-7.18); tag(s,I.website); window._siteBars=[]; for(let i=0;i<8;i++){ const b=glow(.55,1,i%2?'#5fe3d9':'#ffb454',-18.8+i*.8,1.2,-7.1); window._siteBars.push(b);} }
+desk(-18,2,'#5fe3d9',I.website); desk(-14,2,'#5fe3d9',I.website); desk(-22,2,'#ffb454',I.website);
+// POS
+{ const c=box(8,1.1,1.4,'#5a4636',-20,.55,15); tag(c,I.pos); box(.9,.5,.7,'#20262e',-21.5,1.35,15); screen(.7,.35,'#c792ea',-21.5,1.45,15.37); box(.5,.4,.5,'#e8e8e8',-19.5,1.3,15);
+  for(let i=0;i<6;i++){ const gx=-28.5+i*1.5; const body=cyl(.45,.55,.18,['#b5651d','#8e2b2b','#e0b04a','#2b2b2b','#3d6b9b','#c0392b'][i],gx,1.1,22.9); body.rotation.x=Math.PI/2; box(.14,1.4,.08,'#3b2a1c',gx,2,22.85); }
+  for(let i=0;i<3;i++){ const k=box(3.2,.9,1,'#1b1b1f',-26+i*0,.45,10.5+i*2.2); box(3,.1,.35,'#f2f2f2',-26,.95,10.9+i*2.2); tag(k,I.pos); } }
+// CRM
+[[14,-3,'#7bd88f'],[18,-3,'#5fe3d9'],[22,-3,'#7bd88f'],[14,2.5,'#ffb454'],[18,2.5,'#7bd88f'],[22,2.5,'#5fe3d9']].forEach(([x,z,c])=>desk(x,z,c,I.crm));
+for(let i=0;i<6;i++) cabinet(28.3,-6+i*1.9,['#56606c','#7a4b4b','#56606c','#56606c','#4b6a58','#56606c'][i],I.crm);
+{ box(5,2.6,.15,'#0b0f14',20,2.2,7.4); const s=screen(4.6,2.2,'#12301f',20,2.2,7.3,Math.PI); tag(s,I.crm); }
+// Docs
+for(let i=0;i<6;i++) cabinet(28.3,10+i*1.9,'#6c6147',I.docs);
+[[15,12],[19,12],[15,17],[19,17]].forEach(([x,z])=>desk(x,z,'#f2c14e',I.docs));
+{ const pr=box(1.4,1,1,'#d9d9d9',23,.5,21); tag(pr,I.docs); window._paper=box(.9,.03,.6,'#ffffff',23,1.03,21.3); }
+// Repair
+{ const b=box(6,.15,1.6,'#7a5a3a',-4,1,-18); [[-6.8,-17.4],[-1.2,-17.4],[-6.8,-18.6],[-1.2,-18.6]].forEach(([x,z])=>box(.2,1,.2,'#4a3627',x,.5,z)); tag(b,I.repair);
+  cyl(.55,.65,.2,'#b5651d',-4.6,1.2,-18); box(1.8,.1,.16,'#3b2a1c',-3.2,1.2,-18);
+  window._spark=new T.PointLight('#ffb454',0,6); window._spark.position.set(-4,1.8,-18); scene.add(window._spark);
+  box(5,2,.1,'#6d5a44',-4,2.1,-21.6); for(let i=0;i<8;i++) box(.12,.6,.05,['#c9d1d9','#ff8a5c','#ffb454'][i%3],-6+i*.55,2.1,-21.5);
+  const pi=box(3.2,1.3,1.4,'#15171a',5,.65,-19.5); box(3,.12,.4,'#f2f2f2',5,1.12,-18.7); tag(pi,I.repair);
+  for(let i=0;i<3;i++){ const u=cyl(.35,.45,.3,'#8a5a2b',3+i*1.6,1.25,-14.2); u.rotation.z=Math.PI/2; } box(5.4,.12,1.2,'#6b5845',4.6,1,-14.2); }
+// Studio
+{ const kick=cyl(.75,.75,.6,'#c0392b',-22,.9,-16); kick.rotation.x=Math.PI/2; tag(kick,I.studio); cyl(.45,.45,.3,'#c0392b',-23,1.1,-15); cyl(.45,.45,.3,'#c0392b',-21,1.1,-15);
+  const cym=cyl(.6,.6,.03,'#e0b04a',-23.6,1.9,-16.2,{metalness:.8,roughness:.3}); cym.rotation.z=.2; cyl(.02,.02,1.9,'#9aa7b4',-23.6,.95,-16.2);
+  box(3,.2,.9,'#15171a',-15,1,-17); box(2.8,.06,.3,'#f2f2f2',-15,1.13,-16.7); box(.8,1.4,.6,'#20262e',-27,.7,-12); box(.8,1.4,.6,'#20262e',-12.5,.7,-12);
+  window._studioLight=new T.PointLight('#ff7ac6',1.2,14); window._studioLight.position.set(-20,4,-15); scene.add(window._studioLight); }
+// Vault
+[14.5,20,25.5].forEach((x,i)=>{ const d=cyl(1.6,1.6,3.4,'#243650',x,1.7,-15.5,{metalness:.45,roughness:.35},28); tag(d,I.vault); for(let k=0;k<3;k++){ const r=cyl(1.63,1.63,.08,'#6aa8ff',x,.7+k*1,-15.5,{emissive:'#1e4d99',emissiveIntensity:.9},28); tag(r,I.vault);} });
+// Lobby furniture
+const doors={};
+[['WhatsApp','#25d366',-5],['Instagram','#e1306c',0],['Messenger','#4f8cff',5]].forEach(([n,c,x])=>{ const fr=box(2.4,2.8,.3,'#1b1f24',x,1.4,24.2); tag(fr,I.doors); const lamp=new T.Mesh(new T.SphereGeometry(.24,14,12),new T.MeshBasicMaterial({color:c})); lamp.position.set(x,3.1,24.3); scene.add(lamp); doors[n]={x,c,lamp}; const L=label(n,{accent:c,size:.42}); L.position.set(x,4.5,25); });
+desk(0,14,'#5fe3d9'); desk(7,16,'#3bffc1'); desk(-6,9.5,'#c792ea'); desk(-7,18,'#f2c14e');
+{ box(4.2,2.4,.12,'#0b0f14',4,2,7.3); const s=screen(3.9,2.1,'#0f2a2a',4,2,7.37); tag(s,I.lobby); }
+{ const booth=box(1.4,2.4,1.4,'#3d2f2f',8.5,1.2,4); tag(booth,I.lobby); }
+{ const mb=box(.8,1.3,.6,'#b03a2e',5,.65,22.3); tag(mb,I.lobby); }
+plant(-9,22.6); plant(9,22.6); plant(-9,-6.8); plant(9,-6.8);
+// giant hologram above lobby: rotating ring
+const holo=new T.Group(); scene.add(holo); holo.position.set(0,7,8);
+for(let i=0;i<3;i++){ const t=new T.Mesh(new T.TorusGeometry(3+i*1.1,.05,8,80),new T.MeshBasicMaterial({color:i===1?'#ffb454':'#5fe3d9',transparent:true,opacity:.75})); t.rotation.x=Math.PI/2+i*.25; holo.add(t); }
+const core=new T.Mesh(new T.IcosahedronGeometry(1.1,1),new T.MeshBasicMaterial({color:'#ffb454',wireframe:true})); holo.add(core);
+
+// ============ HKULA ============
+const HK='#ff7ac6';
+room({x0:46,z0:-12,x1:70,z1:0,floor:'#2a1f2a',accent:HK,name:'Hkula · worker',labelSize:.75,info:I.hkula,gaps:{s:[[58,3]]}});
+room({x0:46,z0:0,x1:70,z1:16,floor:'#271d26',accent:HK,name:'Hkula · office',labelSize:.75,info:I.hkula,gaps:{w:[[8,3]],n:[[58,3]]}});
+{ const L=label('Hkula',{sub:'company',accent:HK,size:1.4}); L.position.set(58,12,-14); }
+for(let i=0;i<6;i++) rack(49+i*1.6,-9.5,I.hkula,HK);
+[[52,5],[56,5],[60,5],[64,5],[52,11],[56,11],[60,11]].forEach(([x,z],i)=>desk(x,z,i%2?HK:'#5fe3d9',I.hkula));
+{ box(5,2.6,.15,'#0b0f14',64,2.2,15.4); const s=screen(4.6,2.2,'#2e1230',64,2.2,15.3,Math.PI); tag(s,I.hkula); }
+
+// ============ THE ANFAL ============
+const AN='#3fd0a8';
+room({x0:-70,z0:-12,x1:-46,z1:4,floor:'#1c2a27',accent:AN,name:'The Anfal · office',labelSize:.75,info:I.anfal,gaps:{s:[[-58,3]],e:[[-4,3]]}});
+room({x0:-70,z0:4,x1:-46,z1:16,floor:'#1f2a24',accent:AN,name:'The Anfal · ops',labelSize:.75,info:I.anfal,gaps:{n:[[-58,3]],e:[[10,3]]}});
+{ const L=label('The Anfal',{sub:'company',accent:AN,size:1.4}); L.position.set(-58,12,-14); }
+[[-66,-8],[-62,-8],[-58,-8],[-54,-8],[-66,-2],[-62,-2],[-58,-2]].forEach(([x,z],i)=>desk(x,z,i%2?AN:'#ffb454',I.anfal));
+{ const t=box(6,.12,2.4,'#5b4a3a',-52,1,-2); tag(t,I.anfal); }
+for(let i=0;i<6;i++) cabinet(-68.3+i*0,6+i*1.6,'#3d5a52',I.anfal);
+for(let i=0;i<4;i++) rack(-58+i*1.6,13.3,I.anfal,AN);
+
+// ============ ASHER'S LAB ============
+const LB='#b5e86a';
+{ const floor=box(26,.14,14,'#18221a',-56,.07,-36); tag(floor,I.lab);
+  const glass=new T.MeshStandardMaterial({color:'#9fe3c0',transparent:true,opacity:.14,roughness:.1,metalness:.2});
+  box(26,3.2,.1,glass,-56,1.6,-43); box(.1,3.2,14,glass,-69,1.6,-36); box(.1,3.2,14,glass,-43,1.6,-36);
+  const L=label("Asher's Lab",{sub:'personal projects',accent:LB,size:1.3}); L.position.set(-56,10,-38);
+  // Ashgrab kiosk with download arrow
+  const k=box(3,2,2,'#243024',-64,1,-35); tag(k,I.lab); screen(2.6,1.2,'#ff6b6b',-64,1.3,-33.98);
+  window._arrow=new T.Mesh(new T.ConeGeometry(.6,1,4),new T.MeshBasicMaterial({color:'#ff6b6b'})); window._arrow.rotation.x=Math.PI; window._arrow.position.set(-64,4,-35); scene.add(window._arrow);
+  const a=label('Ashgrab',{accent:'#ff6b6b',size:.5}); a.position.set(-64,6,-35);
+  // VPN Stealth tower
+  const tw=box(2,6,2,'#1c2622',-56,3,-38); tag(tw,I.lab); for(let i=0;i<5;i++) led(-56,1+i*1.1,-36.96,LB);
+  const dish=new T.Mesh(new T.ConeGeometry(1,.7,16,1,true),mat('#c9d1d9',{side:T.DoubleSide})); dish.position.set(-56,6.6,-38); dish.rotation.z=-1.1; scene.add(dish); tag(dish,I.lab); window._dish=dish;
+  const v=label('VPN Stealth',{accent:LB,size:.5}); v.position.set(-56,8.4,-38);
+  // askAsher portfolio screen
+  const ps=box(4,2.8,.2,'#0b0f14',-48,1.8,-40); tag(ps,I.lab); screen(3.6,2.4,'#2a3d1a',-48,1.8,-39.88);
+  for(let i=0;i<4;i++) glow(2.6-i*.4,.18,i?'#9fb0c0':LB,-48,2.6-i*.4,-39.86);
+  const p=label('askAsher',{accent:LB,size:.5}); p.position.set(-48,4.3,-40); }
+
+// ============ AI TOWERS ============
+const towers={};
+[['Claude','#d97757',-12,16,'paid · $13/mo'],['Kimi K2.6','#7c5cff',-4,11,'FREE'],['DeepSeek','#4d6bfe',3,10,'FREE'],['Groq','#f55036',10,9,'FREE'],['Gemini','#4f8cff',17,9,'FREE']].forEach(([n,c,x,h,fee])=>{
+  const t=box(4,h,4,'#1a2029',x,h/2,-40); tag(t,I.ai);
+  for(let i=1;i<h;i+=1.1){ for(let k=0;k<3;k++) led(x-1.2+k*1.2,i+.4,-37.97,c); }
+  const cap=box(4.2,.4,4.2,c,x,h+.2,-40,{emissive:c,emissiveIntensity:.5}); tag(cap,I.ai);
+  const L=label(n,{sub:fee,accent:c,size:.6}); L.position.set(x,h+3,-40); towers[n]=new T.Vector3(x,h,-38);
+});
+{ const L=label('AI brains',{sub:'1 paid · 4 free',accent:'#d97757',size:.85}); L.position.set(-24,8,-40); }
+
+// ============ STREET ============
+[['Tabby','#3bffc1',16],['PayPal','#2e86de',23]].forEach(([n,c,x])=>{ const k=box(3.2,2.6,2.4,'#1d2530',x,1.3,48); tag(k,I.money); box(3.4,.3,2.6,c,x,2.75,48,{emissive:c,emissiveIntensity:.5}); const L=label(n,{accent:c,size:.5}); L.position.set(x,4.4,48); });
+// GitHub crane
+{ const mast=box(.8,20,.8,'#f2c14e',36,10,-26); const jib=box(18,.6,.6,'#f2c14e',29,20,-26); const hook=box(.08,6,.08,'#c9d1d9',22,17,-26); window._load=box(1.8,1.3,1.8,'#6aa8ff',22,13.4,-26); [mast,jib,hook,window._load].forEach(m=>tag(m,I.crane)); }
+// street lamps
+for(let i=-5;i<=5;i++){ cyl(.08,.1,5,'#39424d',i*14,2.5,37); const b=new T.Mesh(new T.SphereGeometry(.3,10,8),new T.MeshBasicMaterial({color:'#ffd9a0'})); b.position.set(i*14,5.1,37); scene.add(b); }
+
+// ============ CLOUD DISTRICT (infrastructure) ============
+const INFRA=[
+  {id:'cf',name:'Cloudflare',color:'#f6821f',x:-48,sub:'Workers · KV · Durable Objects',kind:'Edge platform',
+   p:'Runs the three workers. KV keeps chat memory, and a Durable Object groups rapid messages into one reply.',
+   meters:[['Worker requests today',18400,100000],['KV reads today',41200,100000],['KV writes today',640,1000],['Durable Object calls',2900,1000000]]},
+  {id:'fb',name:'Firebase RTDB',color:'#ffca28',x:-24,sub:'akm-files',kind:'Realtime database',
+   p:'Conversations, AI reports, learned facts and the wisdom playbook.',
+   meters:[['Stored',38,1024,'MB'],['Downloaded this month',1.3,10,'GB']]},
+  {id:'fs1',name:'Firestore · Website',color:'#ffa000',x:-8,sub:'shop, bookings, catalogue switches',kind:'Document database',
+   p:'The website, studio bookings and which products are shown.',
+   meters:[['Reads today',21300,50000],['Writes today',1120,20000]]},
+  {id:'fs2',name:'Firestore · POS',color:'#ff8f00',x:8,sub:'sales, invoices',kind:'Document database',
+   p:'The shop till, invoices and daily sales.',
+   meters:[['Reads today',9400,50000],['Writes today',460,20000]]},
+  {id:'gh',name:'GitHub',color:'#c9d1d9',x:26,sub:'code · tests · auto-deploy',kind:'Code and deployments',
+   p:'Every system lives in a repository. Tests run on every change and approved changes deploy automatically.',
+   meters:[['Actions minutes this month',640,2000],['Repositories',13,13]]},
+  {id:'oc',name:'Oracle Cloud',color:'#f80000',x:46,sub:'VPN Stealth server',kind:'Virtual server',
+   p:'The private WireGuard VPN server, standing on its own.',
+   meters:[['CPU',4,100,'%'],['Memory',22,100,'%'],['Bandwidth this month',38,10240,'GB']]},
+  {id:'rd',name:'Render',color:'#46e3b7',x:64,sub:'Ashgrab engine',kind:'App hosting',
+   p:'Runs the Ashgrab download engine.',
+   meters:[['Instance hours',212,750],['Bandwidth',6,100,'GB']]},
+];
+const INFRA_Z=62;
+{ box(150,.05,26,'#10161d',8,.03,INFRA_Z); const L=label('Cloud district',{sub:'where it all runs',accent:'#f6821f',size:1.2}); L.position.set(-66,9,INFRA_Z-4); }
+INFRA.forEach(v=>{
+  const info={kind:v.kind,name:v.name,p:v.p}; v.info=info; const x=v.x, z=INFRA_Z;
+  const base=box(12,.3,12,'#161d25',x,.15,z); tag(base,info);
+  if(v.id==='cf'){ const b=box(9,6,7,'#20262f',x,3,z); tag(b,info); box(9.2,.4,7.2,v.color,x,6.2,z,{emissive:v.color,emissiveIntensity:.5}); for(let i=0;i<3;i++){ const pod=cyl(.9,.9,1.6,'#2b3139',x-3+i*3,7.2,z,{},16); tag(pod,info); led(x-3+i*3,7.6,z+.92,['#ffb454','#5fe3d9','#ff7ac6'][i]); } for(let r=0;r<4;r++) for(let c=0;c<6;c++) led(x-3.8+c*1.5,1+r*1.3,z+3.53,v.color); }
+  else if(v.id.startsWith('f')){ const d=cyl(2.4,2.4,4.6,'#2a2413',x,2.4,z,{metalness:.4,roughness:.4},28); tag(d,info); for(let k=0;k<4;k++){ const r=cyl(2.43,2.43,.1,v.color,x,.8+k*1.2,z,{emissive:v.color,emissiveIntensity:.8},28); tag(r,info);} const f=new T.Mesh(new T.ConeGeometry(.9,1.8,3),new T.MeshBasicMaterial({color:v.color})); f.position.set(x,5.8,z); scene.add(f); v.spin=f; }
+  else if(v.id==='gh'){ const b=box(8,4.5,7,'#1b1f24',x,2.25,z); tag(b,info); for(let r=0;r<3;r++) for(let c=0;c<5;c++){ const bk=box(1.1,1,.3,['#f1e05a','#e34c26','#3178c6','#563d7c','#89e051'][(r+c)%5],x-3+c*1.5,.9+r*1.3,z+3.6); tag(bk,info);} const cat=new T.Mesh(new T.SphereGeometry(1.2,20,16),mat('#c9d1d9',{metalness:.3})); cat.position.set(x,5.8,z); scene.add(cat); tag(cat,info); }
+  else if(v.id==='oc'){ for(let i=0;i<3;i++){ rack(x-2+i*2,z,info,'#ff4d4d'); } const hut=box(7,.3,4,'#2a1414',x,2.9,z); tag(hut,info); const mast=cyl(.12,.16,7,'#9aa7b4',x+3.5,3.5,z-2); tag(mast,info); led(x+3.5,7.1,z-2,'#b5e86a'); }
+  else { const b=box(6,3,5,'#17302a',x,1.5,z); tag(b,info); box(6.2,.3,5.2,v.color,x,3.15,z,{emissive:v.color,emissiveIntensity:.5}); }
+  v.lamp=new T.Mesh(new T.SphereGeometry(.45,14,12),new T.MeshBasicMaterial({color:'#7bd88f'})); v.lamp.position.set(x+5,1.2,z+5); scene.add(v.lamp);
+  const L=label(v.name,{sub:v.sub,accent:v.color,size:.7}); L.position.set(x,11,z);
+});
+
+// ---------------- pipelines ----------------
+const pipes=[]; const P=(x,y,z)=>new T.Vector3(x,y,z);
+function pipe(pts,color,name,opts={}){
+  const path=new T.CurvePath(); const v=pts.map(q=>new T.Vector3(q[0],q[1],q[2]));
+  for(let i=0;i<v.length-1;i++) path.add(new T.LineCurve3(v[i],v[i+1]));
+  const len=path.getLength();
+  const tube=new T.Mesh(new T.TubeGeometry(path,Math.max(20,Math.round(len*2)),opts.r||.2,10,false),mat(color,{metalness:.55,roughness:.3,emissive:color,emissiveIntensity:.18}));
+  tube.castShadow=true; scene.add(tube);
+  for(const q of v){ const j=new T.Mesh(new T.SphereGeometry((opts.r||.2)*1.45,12,10),mat('#2b3139',{metalness:.6,roughness:.3})); j.position.copy(q); scene.add(j); }
+  const info={kind:'Pipeline',name,p:opts.p||''}; tag(tube,info);
+  const n=Math.max(3,Math.round(len/6)), pulses=[];
+  for(let i=0;i<n;i++){ const m=new T.Mesh(new T.BoxGeometry(.5,.5,.5),new T.MeshBasicMaterial({color:new T.Color(color).lerp(new T.Color('#ffffff'),.45)})); scene.add(m); pulses.push({m,t:i/n}); }
+  if(opts.label){ const mid=path.getPointAt(opts.at||.5); const L=label(name,{accent:color,size:.34}); L.position.set(mid.x,mid.y+1.6,mid.z); }
+  pipes.push({path,pulses,len,owner:opts.owner||null,speed:opts.speed||7});
+  return path;
+}
+function station(x,z,color,name,info){ const pad=cyl(1.1,1.1,.25,'#1b232c',x,.13,z,{},20); const ring=cyl(1.12,1.12,.08,color,x,.27,z,{emissive:color,emissiveIntensity:.8},20); tag(pad,info); tag(ring,info); const L=label(name,{accent:color,size:.34}); L.position.set(x,1.9,z); }
+const PC={msg:'#5fe3d9',ai:'#d97757',doc:'#f2c14e',money:'#3bffc1',pos:'#c792ea',data:'#6aa8ff',web:'#2ec4b6',edge:'#f6821f',code:'#c9d1d9',hk:'#ff7ac6',an:'#3fd0a8',lab:'#b5e86a'};
+// Messages in through the doors
+pipe([[-5,.5,30],[-5,.5,20],[0,.5,20],[0,.5,15]],PC.msg,'Messages in',{owner:'akmpay',p:'WhatsApp, Instagram and Messenger messages flowing to the Receptionist.'});
+// akm-pay → AI brains (overhead)
+pipe([[0,.5,11],[0,7,11],[0,7,-33],[-12,7,-33],[-12,7,-38]],PC.ai,'AI requests',{owner:'akmpay',label:true,at:.45,r:.26,p:'Drafts requested from Claude first, then the free brains.'});
+pipe([[-12,7,-33],[17,7,-33],[17,7,-38]],PC.ai,'Free AI fallback',{owner:'akmpay',p:'Kimi K2.6, DeepSeek, Groq and Gemini: free, ready if Claude is busy.'});
+// Docs: quotation → invoice → delivery order
+station(14,11,PC.doc,'Quotation',I.docs); station(14,20.5,PC.doc,'Invoice',I.docs); station(25,20.5,PC.doc,'Delivery order',I.docs);
+pipe([[14,.5,11],[14,.5,20.5],[25,.5,20.5]],PC.doc,'Quotation → Invoice → Delivery',{label:true,at:.3,p:'Every quotation becomes an invoice, and every invoice a delivery order, without retyping.'});
+// Invoice → payments → Tabby/PayPal
+pipe([[19,.5,23],[19,.5,44],[16,.5,44],[16,.5,46.8]],PC.money,'Payments',{owner:'akmpay',label:true,at:.5,p:'Payment links out to Tabby and PayPal; confirmed payments flow back and mark invoices paid.'});
+pipe([[19,.5,44],[23,.5,44],[23,.5,46.8]],PC.money,'PayPal',{owner:'akmpay'});
+// POS: sales + expenses → Firestore POS
+station(-17,18.5,PC.pos,'POS sale',I.pos); station(-25,20.5,PC.pos,'Expenses',I.pos);
+pipe([[-17,.5,18.5],[-17,.5,30],[7.4,.5,30],[7.4,.5,56]],PC.pos,'POS sales',{label:true,at:.55,p:'Every sale is recorded in the POS database the moment it is rung up.'});
+pipe([[-25,.5,20.5],[-25,.5,31.5],[8.6,.5,31.5],[8.6,.5,56]],PC.pos,'Expense records',{p:'Shop expenses recorded alongside sales for the daily report.'});
+// CRM ↔ vault ↔ Firebase RTDB
+pipe([[18,.5,4],[20,.5,4],[20,.5,-12]],PC.data,'CRM records',{p:'Conversations and tickets saved to the records vault.'});
+pipe([[30,4.5,-15],[37,4.5,-15],[37,4.5,38],[-24,4.5,38],[-24,4.5,57]],PC.data,'Realtime database',{label:true,at:.35,r:.24,p:'The vault syncs with Firebase Realtime Database in real time.'});
+// Website ↔ Firestore web
+pipe([[-18,.5,0],[-34,.5,0],[-34,.5,42],[-8,.5,42],[-8,.5,56]],PC.web,'Website data',{owner:'website',label:true,at:.4,p:'Products, studio bookings and catalogue switches for akm-music.com.'});
+// akm-pay → Cloudflare KV
+pipe([[-6,.5,23],[-6,.5,36],[-48,.5,36],[-48,.5,55.5]],PC.edge,'Chat memory (KV)',{owner:'akmpay',label:true,at:.6,p:'Recent conversation memory kept at the edge on Cloudflare.'});
+// GitHub → deploy to Cloudflare
+pipe([[26,2.5,56],[26,2.5,50],[-48,2.5,50],[-48,2.5,56]],PC.code,'Deploys',{label:true,at:.5,speed:10,p:'Tested code deployed automatically to Cloudflare on every approved change.'});
+// Oracle → Asher's Lab (VPN)
+pipe([[46,8,57],[46,8,-50],[-56,8,-50],[-56,8,-43]],PC.lab,'VPN tunnel',{label:true,at:.3,r:.22,p:'Encrypted WireGuard tunnel from the Oracle Cloud server.'});
+// Hkula & Anfal → AI
+pipe([[58,.5,-12],[58,.5,-30],[20,.5,-30],[20,.5,-36]],PC.hk,'Hkula AI',{owner:'hkula',p:'Hkula\'s worker using the same AI brains.'});
+pipe([[-58,.5,-12],[-58,.5,-30],[-14,.5,-30],[-14,.5,-36]],PC.an,'The Anfal AI',{p:'The Anfal connected to the shared AI brains.'});
+
+// ---------------- robots ----------------
+const robots=[];
+function makeRobot(r){
+  const g=new T.Group(); const bodyM=mat(r.color,{roughness:.45,metalness:.35});
+  const base=new T.Mesh(new T.CylinderGeometry(.42,.5,.25,16),mat('#2b3139')); base.position.y=.14; g.add(base);
+  const body=new T.Mesh(new T.CylinderGeometry(.36,.44,.8,16),bodyM); body.position.y=.66; g.add(body);
+  const chest=new T.Mesh(new T.PlaneGeometry(.34,.2),new T.MeshBasicMaterial({color:r.color})); chest.position.set(0,.72,.42); g.add(chest);
+  const head=new T.Group(); head.position.y=1.28; g.add(head);
+  head.add(new T.Mesh(new T.BoxGeometry(.7,.48,.56),bodyM));
+  const visor=new T.Mesh(new T.PlaneGeometry(.56,.22),new T.MeshBasicMaterial({color:'#0b0f14'})); visor.position.set(0,.02,.285); head.add(visor);
+  const eyeM=new T.MeshBasicMaterial({color:'#5fe3d9'});
+  const e1=new T.Mesh(new T.SphereGeometry(.06,10,8),eyeM); e1.position.set(-.13,.02,.3); head.add(e1); const e2=e1.clone(); e2.position.x=.13; head.add(e2);
+  const ant=new T.Mesh(new T.CylinderGeometry(.02,.02,.3,6),mat('#9aa7b4')); ant.position.y=.38; head.add(ant);
+  const bulbM=new T.MeshBasicMaterial({color:r.color}); const bulb=new T.Mesh(new T.SphereGeometry(.08,10,8),bulbM); bulb.position.y=.56; head.add(bulb);
+  const armL=new T.Mesh(new T.BoxGeometry(.12,.5,.12),bodyM); armL.position.set(-.48,.7,0); g.add(armL); const armR=armL.clone(); armR.position.x=.48; g.add(armR);
+  let carry=null; if(r.carry){ carry=new T.Mesh(new T.BoxGeometry(.45,.35,.35),mat(r.carry)); carry.position.set(0,.95,.45); g.add(carry); }
+  g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
+  g.position.copy(r.home); scene.add(g);
+  if(r.pad){ const pad=cyl(.62,.62,.06,'#1b2530',r.home.x,.13,r.home.z,{emissive:'#0e3b39',emissiveIntensity:.7},24); tag(pad,r); }
+  const z=label('z Z',{accent:'#5b6878',size:.22}); z.visible=false;
+  Object.assign(r,{g,head,eyeM,bulbM,armL,armR,carry,z,state:r.wander?'go':'sleep',pi:0,pts:[],work:0,ph:Math.random()*6,wp:0});
+  if(r.wander){ r.pts=[r.home.clone(),r.route[0]]; }
+  tag(g,r); robots.push(r); return r;
+}
+const V=(x,z)=>new T.Vector3(x,.13,z);
+const R={};
+const jobDefs=[
+  ['reply','Receptionist','#5fe3d9','Answers every customer message. Reads the chat, phones an AI brain for a draft, checks it against the shop\'s rules, then replies in seconds.',[V(0,12.8)]],
+  ['booking','Booking clerk','#c792ea','Books, moves and cancels practice-studio sessions straight from WhatsApp.',[V(-6,8.3)]],
+  ['leads','Lead desk','#f2c14e','Receives the website\'s enquiry forms and confirms each one with its reference.',[V(-7,16.8)]],
+  ['cashier','Cashier','#3bffc1','Creates payment links and double-checks every payment before an invoice is marked paid.',[V(7,14.8)]],
+  ['alert','Alert runner','#ff6b6b','Pages the team on WhatsApp when a customer needs a person.',[V(8.3,5.6)]],
+  ['crmask','CRM assistant','#7bd88f','Answers the team\'s questions inside the CRM.',[V(9,0),V(12,0),V(17,-1.4)]],
+  ['sweeper','Sweeper','#9aa7b4','Every 5 minutes: makes sure no customer is left waiting and the message lines are connected.',[V(-2,4),V(2,5)]],
+  ['inspector','Inspector','#6aa8ff','Every hour: tests every AI brain and channel and updates the health board.',[V(4,6.2)]],
+  ['librarian','Librarian','#ffb454','Every 6 hours: syncs the product catalogue from the website.',[V(-9,0),V(-12,0),V(-17,.8)]],
+  ['analyst','Night analyst','#b5e86a','Every morning: reads yesterday\'s chats and learns new facts from the team\'s replies.',[V(0,-7),V(0,-10),V(8,-12),V(12,-10),V(16,-12.5)]],
+  ['reporter','Reporter','#ff7ac6','Every Friday morning: counts the week and emails the owner a report.',[V(5,21.3)]],
+  ['doorman','Doorman','#c9d1d9','Answers health checks and reports if any service is down.',[V(0,20.8)]],
+];
+jobDefs.forEach(([id,name,color,job,route],i)=>{ R[id]=makeRobot({id,name,color,job,kind:'AKM Music · akm-pay robot',home:V(-8.2+i*1.5,-6.3),route,pad:true,owner:'akmpay'}); });
+R.site=makeRobot({name:'Site server',color:'#5fe3d9',job:'The akm-website worker: serves every page of akm-music.com.',kind:'AKM Music · akm-website robot',home:V(-26,-3),route:[V(-26,-3),V(-18,.5),V(-14,.5)],wander:true,owner:'website'});
+// wandering staff robots (couriers) in every building
+const wanderers=[
+  ['Courier','#ffb454','#c9a55a',[V(-4,12),V(-16,15),V(-20,3),V(-4,3)]],
+  ['Courier','#f2c14e','#f4f1e8',[V(4,14),V(15,15),V(21,19),V(6,18)]],
+  ['Technician','#ff8a5c','#8a5a2b',[V(-3,-16),V(3,-12),V(6,-17),V(-6,-12)]],
+  ['Archivist','#6aa8ff','#6aa8ff',[V(16,-12),V(24,-11),V(26,-18),V(18,-18)]],
+  ['Sound tech','#ff7ac6',null,[V(-24,-12),V(-14,-14),V(-18,-19)]],
+  ['Support agent','#7bd88f',null,[V(13,-.5),V(24,-.5),V(24,5),V(13,5)]],
+  ['Hkula engineer','#ff7ac6',null,[V(50,-4),V(64,-4),V(66,-9)]],
+  ['Hkula agent','#ff7ac6','#ff7ac6',[V(50,8),V(62,8),V(62,13),V(50,13)]],
+  ['Hkula ops','#ffd1ea',null,[V(58,2),V(66,12),V(54,14)]],
+  ['Anfal analyst','#3fd0a8',null,[V(-66,-5),V(-52,-5),V(-52,1)]],
+  ['Anfal courier','#3fd0a8','#f2c14e',[V(-64,8),V(-50,8),V(-50,13),V(-64,13)]],
+  ['Anfal manager','#a5f0da',null,[V(-60,-10),V(-48,-2),V(-60,2)]],
+  ['Lab bot','#b5e86a',null,[V(-66,-38),V(-58,-34),V(-46,-37)]],
+  ['Lab bot','#ffb454',null,[V(-50,-33),V(-62,-40),V(-54,-34)]],
+];
+const WJOBS={Courier:'Carries documents and parcels between rooms.',Technician:'Works on instruments at the repair bench.',Archivist:'Files records into the vault.','Sound tech':'Gets the practice studio ready between sessions.','Support agent':'Follows up on customer conversations in the CRM.'};
+wanderers.forEach(([name,color,carry,route])=>{ makeRobot({owner:name.startsWith('Hkula')?'hkula':null,name,color,carry,job:WJOBS[name]||'Keeps this building running around the clock.',kind:name.startsWith('Hkula')?'Hkula · staff robot':name.startsWith('Anfal')?'The Anfal · staff robot':name==='Lab bot'?"Asher's Lab · robot":'AKM Music · staff robot',home:route[route.length-1].clone(),route,wander:true}); });
+
+// ---------------- flying envelopes & beams ----------------
+const flyers=[];
+function envelope(from,to,color,dur=1.3,onDone){ const m=new T.Mesh(new T.BoxGeometry(.6,.38,.06),new T.MeshBasicMaterial({color})); scene.add(m); flyers.push({m,from:from.clone(),to:to.clone(),t:0,dur,onDone}); }
+function beam(from,to,color){ const l=new T.Line(new T.BufferGeometry().setFromPoints([from,to]),new T.LineBasicMaterial({color,transparent:true})); scene.add(l); flyers.push({line:l,t:0,dur:1.4}); }
+
+// ---------------- simulation data (fake, masked) ----------------
+let seed=0; const rnd=()=>{ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const mask=()=>'';
+const MSGS=[
+  ['Do you have the Yamaha P-145 in stock?','AI replied','ai','purchase'],
+  ['How much are piano classes per month?','AI replied','ai','class'],
+  ['Can I book the practice room Saturday 5pm?','Booked','ok','booking'],
+  ['Price to restring an acoustic guitar?','AI replied','ai','repair'],
+  ['هل عندكم عود للمبتدئين؟','AI replied','ai','purchase'],
+  ['My guitar neck is cracked, can you fix it?','Repair ticket','ok','repair'],
+  ['Where are you located?','Map pin sent','ai','general'],
+  ['I want to speak to someone about a school order','Handed to team','team','quote'],
+  ['Are you open today?','AI replied','ai','general'],
+  ['Do you rent keyboards for events?','Handed to team','team','rental'],
+  ['Thanks, see you tomorrow!','AI replied','ai','general'],
+  ['Can I pay with Tabby?','Payment link sent','ok','pay'],
+  ['Violin for my daughter, 8 years old?','AI replied','ai','purchase'],
+  ['Band practice, 3 hours on Friday?','Booked','ok','booking'],
+  ['متى تفتحون يوم الجمعة؟','AI replied','ai','general'],
+  ['Drum lessons available for adults?','AI replied','ai','class'],
+];
+const CH=[['WhatsApp','#25d366',.7],['Instagram','#e1306c',.15],['Messenger','#4f8cff',.1],['Website','#5fe3d9',.05]];
+function chooseCh(){ let r=Math.random(),a=0; for(const c of CH){ a+=c[2]; if(r<a) return c; } return CH[0]; }
+const inbox=[], doneJobs=[]; let stats=null, statsDay=null;
+function curve(h){ return Math.max(.2, Math.exp(-((h-12.5)**2)/8)*1+Math.exp(-((h-19)**2)/6)*1.25 + (h>=10&&h<22?.35:0)); }
+function initStats(dayKey,uaeHour){
+  seed=dayKey*7919; const hourly=[];
+  for(let h=0;h<24;h++) hourly.push(h<uaeHour?Math.round(curve(h)*(7+rnd()*5)):0);
+  const msgs=hourly.reduce((a,b)=>a+b,0);
+  stats={hourly,msgs,ai:Math.round(msgs*.84),team:0,bookings:Math.round(msgs*.07)+1,payments:Math.round(msgs*.04)+1,revenue:0,jobs:Math.round(uaeHour*12+60),ch:{WhatsApp:0,Instagram:0,Messenger:0,Website:0},week:[],resp:[]};
+  stats.team=msgs-stats.ai; 
+  for(const c of CH) stats.ch[c[0]]=Math.round(msgs*c[2]);
+  for(let i=0;i<7;i++){ stats.week.push(Math.round(95+rnd()*60)); stats.resp.push(+(3+rnd()*3).toFixed(1)); }
+  statsDay=dayKey;
+}
+
+// ---------------- sim clock + events ----------------
+let speed=1, sim=Date.now(), lastMin=Math.floor(sim/60000);
+const uae=ms=>new Date(ms+4*3600000);
+const hhmm=d=>String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
+const nowUae=()=>uae(sim);
+
+function toast(){ return; }
+function _unusedToast(title,body,color){ const box=document.getElementById('toasts'); const el=document.createElement('div'); el.className='toast'; el.innerHTML=`<span class="d" style="background:${color}"></span><div><small>${title} · ${hhmm(nowUae())}</small>${body}</div>`; box.prepend(el); while(box.children.length>3) box.lastChild.remove(); setTimeout(()=>{el.classList.add('out'); setTimeout(()=>el.remove(),450);},4200); }
+function jobDone(name,what,color){ doneJobs.unshift({t:hhmm(nowUae()),name,what,color}); doneJobs.length=Math.min(doneJobs.length,40); stats.jobs++; }
+const W={akmpay:true,website:true,hkula:true};
+const isOff=r=>(r.owner&&!W[r.owner])||r.disabled;
+function wake(r,what){ if(!r||isOff(r)) return; if(r.state==='sleep'){ r.state='go'; r.pi=0; r.pts=[r.home.clone(),...r.route]; r.work=3; r.dur=3; r.task=what; } else { r.work=Math.max(r.work,2.2); r.task=what||r.task; } if(what) jobDone(r.name,what,r.color); }
+
+function incoming(forced){
+  if(!W.akmpay){ const ch=forced||chooseCh(); const x=doors[ch[0]]?doors[ch[0]].x:-7; envelope(P(x,1.7,31),P(x,1.7,24.8),'#ff6b6b',1); stats.missed=(stats.missed||0)+1; return; }
+  const ch=forced||chooseCh(); const [name,color]=ch; const [text,status,kind,topic]=pick(MSGS);
+  const u=nowUae(); const h=u.getUTCHours();
+  stats.hourly[h]++; stats.msgs++; stats.ch[name]=(stats.ch[name]||0)+1; if(kind==='team') stats.team++; else stats.ai++;
+  const reply=(2+Math.random()*4).toFixed(1);
+  act(kind==='team'?`${name} message handed to the team`:`${name} message answered by AI in ${reply}s`,color,'Messages');
+  const x=doors[name]?doors[name].x:-7; const from=name==='Website'?P(-16,3,-2):P(x,1.7,31);
+  envelope(from,P(0,1.4,14),color,1.3,()=>{
+    wake(R.reply,`${name} reply sent in ${reply}s`);
+    setTimeout(()=>beam(P(0,1.6,14),towers[Math.random()<.8?'Claude':pick(['Kimi K2.6','DeepSeek','Groq','Gemini'])],'#d97757'),500);
+    if(topic==='booking'){ wake(R.booking,'Practice studio booked'); stats.bookings++; }
+    if(topic==='repair'||topic==='quote'||topic==='rental') wake(R.leads,'Ticket reference issued');
+    if(kind==='team') wake(R.alert,'Team paged on WhatsApp');
+    if(topic==='pay') wake(R.cashier,'Payment link created');
+    refresh();
+  });
+}
+function payment(){ if(!W.akmpay) return; const which=Math.random()<.6?'Tabby':'PayPal'; const x=which==='Tabby'?16:23; stats.payments++; act('Payment verified with '+which,'#3bffc1','Payments');
+  envelope(P(x,3,48),P(7,1.4,16),which==='Tabby'?'#3bffc1':'#2e86de',1.6,()=>{ wake(R.cashier,`${which} payment verified`); setTimeout(()=>envelope(P(7,1.4,16),P(20,1.4,15),'#f2c14e',1.1),800); refresh(); }); }
+
+function tickMinute(ms){
+  const d=new Date(ms), m=d.getUTCMinutes(), h=d.getUTCHours();
+  if(m%5===0) wake(R.sweeper,'Checked waiting chats');
+  if(m===0){ wake(R.inspector,'Hourly health check: all green'); if(h%6===2) wake(R.librarian,'Catalogue synced'); if(h===2){ wake(R.analyst,'Learned 4 new facts'); if(d.getUTCDay()===5) setTimeout(()=>{ wake(R.reporter,'Weekly report emailed'); toast('Reporter','Weekly report emailed to the owner','#ff7ac6'); },1200); } }
+}
+
+let nextAct=1.5;
+function recordEvents(dt){ nextAct-=dt*Math.min(4,1+Math.log10(speed)); if(nextAct>0) return; const [t,c,a]=pick(ACT_TYPES.filter(x=>x[2]!=='Payments')); act(t,c,a); if(a==='Studio') wake(R.booking,'Studio booking confirmed'); if(a==='Website') wake(R.librarian,'Catalogue synced'); if(a==='CRM') wake(R.crmask,'CRM record saved'); nextAct=2+Math.random()*4; refresh(); }
+// real-time event scheduler (so Live mode is always busy)
+let nextMsg=2, nextPay=18, nextMisc=6;
+function realtimeEvents(dt){
+  const h=nowUae().getUTCHours(); const open=h>=9&&h<23; const f=Math.min(4,1+Math.log10(speed));
+  nextMsg-=dt*f; nextPay-=dt*f; nextMisc-=dt*f;
+  if(nextMsg<=0){ incoming(); nextMsg=open?4+Math.random()*6:12+Math.random()*10; }
+  if(nextPay<=0){ payment(); nextPay=open?22+Math.random()*20:60+Math.random()*40; }
+  if(nextMisc<=0){ const r=Math.random(); if(r<.35) wake(R.crmask,'Answered a team question'); else if(r<.6) wake(R.doorman,'Health check: OK'); else if(r<.8){ wake(R.leads,'Website form confirmed'); } else wake(R.librarian,'Prices refreshed'); nextMisc=5+Math.random()*7; }
+}
+
+// ---------------- UI: drawer, charts ----------------
+const drawer=document.getElementById('drawer'), dBody=document.getElementById('dBody'), dTitle=document.getElementById('dTitle');
+let tab=null;
+const TABS=['Inbox','Jobs','Reports','Infra'];
+function openTab(t){ tab=(tab===t)?null:t; TABS.forEach(n=>document.getElementById('b'+n).setAttribute('aria-pressed',String(tab===n))); drawer.hidden=!tab; if(tab){ dTitle.textContent={Inbox:'Live activity',Jobs:"Today's jobs",Infra:'Infrastructure'}[tab]||tab; refresh(true);} }
+TABS.forEach(n=>document.getElementById('b'+n).addEventListener('click',()=>openTab(n)));
+function infraStatus(v){ if(v.id==='cf'&&!(W.akmpay&&W.website&&W.hkula)) return 'warn'; return v.down?'bad':'ok'; }
+const drift=(v,f)=>Math.round(v*(1+f)*10)/10;
+function meterHTML([n,v,lim,unit]){ const pct=Math.min(100,v/lim*100); const c=pct>85?'#ff6b6b':pct>60?'#ffb454':'#5fe3d9'; const fmt=x=>x>=1000?Math.round(x).toLocaleString():x; return `<div class="meter"><div class="l"><span>${n}</span><span>${fmt(v)}${unit?' '+unit:''} / ${fmt(lim)}${unit?' '+unit:''}</span></div><div class="t"><i style="width:${pct.toFixed(1)}%;background:${c}"></i></div></div>`; }
+const COSTS=[['Claude API (replies)','#d97757',13.4],['Kimi K2.6 · NVIDIA','#7c5cff',0],['DeepSeek','#4d6bfe',0],['Groq','#f55036',0],['Gemini','#4f8cff',0],['Cloudflare Workers + KV','#f6821f',0],['Firebase + Firestore','#ffca28',0],['GitHub + Actions','#c9d1d9',0],['Oracle Cloud (Always Free)','#f80000',0],['Render','#46e3b7',0]];
+const REPOS=[['akm-pay-worker','AI replies, payments, bookings','#f1e05a','Cloudflare Worker'],['AKM-Web','akm-music.com','#e34c26','Cloudflare'],['AKM-CRM','crm.akm-music.com','#f1e05a','Firebase'],['AKM-Docs','invoices & quotes','#f1e05a','Firebase'],['AKM-POS','shop till','#f1e05a','Firebase'],['hkula','Hkula worker','#3178c6','Cloudflare Worker'],['Ashgrab','video downloader','#3178c6','Render'],['VPN Stealth','private VPN','#89e051','Oracle Cloud'],['askAsher','portfolio','#e34c26','web'],['Architectural-Dashboard','this dashboard','#e34c26','GitHub Pages']];
+function infraHTML(){
+  const issues=[]; if(!W.akmpay) issues.push(['bad','akm-pay worker stopped: customer messages are not being answered']); if(!W.website) issues.push(['bad','akm-website worker stopped: the website is offline']); if(!W.hkula) issues.push(['bad','hkula worker stopped']);
+  robots.filter(r=>r.disabled).forEach(r=>issues.push(['warn',r.name+' switched off']));
+  const up=INFRA.filter(v=>infraStatus(v)==='ok').length;
+  return `<div class="kpis"><div class="kpi"><b>${up}/${INFRA.length}</b><span>Platforms healthy</span></div><div class="kpi"><b>${Object.values(W).filter(Boolean).length}/3</b><span>Workers running</span></div></div>
+  
+  <div class="kicker">Platforms</div>${INFRA.map(v=>{ const st=infraStatus(v); return `<div class="prov"><h4>${v.name}<span class="st ${st}">${st==='ok'?'running':st==='warn'?'partial':'down'}</span></h4><div class="sub">${v.sub}</div>${v.meters.map(m=>meterHTML([m[0],m[2]>=100?Math.round(m[1]*(1+(Math.sin(performance.now()/4000+m[1])*.03))):drift(m[1],Math.sin(performance.now()/5000)*.02),m[2],m[3]])).join('')}</div>`; }).join('')}
+  <div class="kicker">Running costs this month</div>
+  <div class="prov">${COSTS.map(([n,c,v])=>`<div class="repo"><span class="d" style="background:${c}"></span><span>${n}</span><small style="color:${v?'#ffb454':'#7bd88f'}">${v?'$'+v.toFixed(2):'FREE'}</small></div>`).join('')}
+  <div class="repo" style="border:0"><span></span><b>Total</b><b style="font-family:var(--mono)">$${COSTS.reduce((a,c)=>a+c[2],0).toFixed(2)}/mo</b></div></div>
+  <div class="prov"><h4>AI brains<span class="st ok">running</span></h4><div class="sub">Claude (paid) · Kimi K2.6 · DeepSeek · Groq · Gemini (free)</div>${meterHTML(['AI calls today',stats.msgs*2+40,5000])}${meterHTML(['Claude spend this month',13.4,50,'$'])}</div>
+  <div class="prov"><h4>Meta<span class="st ok">running</span></h4><div class="sub">WhatsApp · Instagram · Messenger</div></div>
+  <div class="kicker">Code · ${REPOS.length} repositories</div>${REPOS.map(([n,d,c,h])=>`<div class="repo"><span class="d" style="background:${c}"></span><span>${n}<br><small>${d}</small></span><small>${h}</small></div>`).join('')}
+  <p class="foot">Usage figures are illustrative.</p>`;
+}
+function workersHTML(){
+  const sw=(id,on,title,sub,child)=>`<div class="sw${child?' child':''}"><div>${title}<small>${sub}</small></div><button class="toggle" role="switch" aria-checked="${on}" data-id="${id}" aria-label="${title}"></button></div>`;
+  return `<div class="kicker">Cloudflare workers</div>`
+   +sw('w:akmpay',W.akmpay,'akm-pay','AI replies, payments, bookings · 12 robots')
+   +robots.filter(r=>r.owner==='akmpay').map(r=>sw('r:'+r.id,!r.disabled,r.name,r.job.split('.')[0],true)).join('')
+   +sw('w:website',W.website,'akm-website','serves akm-music.com')
+   +sw('w:hkula',W.hkula,'hkula','Hkula company worker')
+   +`<p class="foot">Switch one off to see what stops. This is a model: it does not change the real workers.</p>`;
+}
+dBody.addEventListener('click',e=>{ const b=e.target.closest('.toggle'); if(!b) return; const [k,id]=b.dataset.id.split(':');
+  if(k==='w') W[id]=!W[id]; else { const r=robots.find(x=>x.id===id); r.disabled=!r.disabled; }
+  refresh(true); });
+document.getElementById('dClose').addEventListener('click',()=>openTab(tab));
+
+const ACT=[];
+const ACT_TYPES=[['Quotation generated','#f2c14e','Docs'],['Invoice issued','#f2c14e','Docs'],['Delivery order created','#f2c14e','Docs'],['POS sale recorded','#c792ea','POS'],['POS sale in progress','#c792ea','POS'],['Expense recorded','#c792ea','POS'],['Receipt printed','#c792ea','POS'],['Studio booking confirmed','#ff7ac6','Studio'],['Repair ticket opened','#ff8a5c','Repair'],['Payment verified','#3bffc1','Payments'],['Catalogue synced','#5fe3d9','Website'],['CRM record saved','#6aa8ff','CRM']];
+function act(type,color,area){ ACT.unshift({t:hhmm(nowUae()),type,color,area}); ACT.length=Math.min(ACT.length,50); stats.docs=(stats.docs||0)+1; }
+function inboxHTML(){ return `<div class="kicker">Messages answered today · ${stats.msgs}</div><div class="kicker">Live activity</div>`+ACT.map(a=>`<div class="msg"><span class="d" style="background:${a.color}"></span><div><div>${a.type}</div><div class="meta"><span>${a.t}</span><span>${a.area}</span><span class="chip ok">done</span></div></div></div>`).join(''); }
+function _oldInboxHTML(){ return `<div class="kicker">Incoming · ${stats.msgs} today</div>`+inbox.map(m=>`<div class="msg"><span class="d" style="background:${m.color}"></span><div><div>${m.text}</div><div class="meta"><span>${m.t}</span><span>${m.ch}</span><span>${m.from}</span><span class="chip ${m.kind}">${m.status}${m.kind==='ai'?' · '+m.reply+'s':''}</span></div></div></div>`).join(''); }
+function jobsHTML(){
+  const running=robots.filter(r=>!r.wander&&r.state!=='sleep');
+  const u=nowUae(), mins=u.getUTCHours()*60+u.getUTCMinutes();
+  const next5=5-(mins%5); const nextH=60-(u.getUTCMinutes());
+  const sched=[['every 5 min','Sweeper · waiting chats & lines',`in ${next5} min`],['hourly','Inspector · health check',`in ${nextH} min`],['06:00','Night analyst · daily learning',mins>=360?'done':'upcoming'],['06:00, 12:00, 18:00, 00:00','Librarian · catalogue sync','4× a day'],['Fri 06:00','Reporter · weekly email',u.getUTCDay()===5&&mins>=360?'sent':'Friday']];
+  return `<div class="kicker">Running now · ${running.length}</div>`+(running.length?running.map(r=>`<div class="job"><div><b>${r.name}</b><br><small>${r.task||'working'}</small></div><small>${r.state==='work'?'working':'on the way'}</small><div class="bar"><i style="width:${r.state==='work'?Math.round((1-r.work/(r.dur||3))*100):8}%;background:${r.color}"></i></div></div>`).join(''):'<p class="foot">All robots are resting.</p>')
+  +`<div class="kicker">Scheduled</div>`+sched.map(s=>`<div class="sched"><span class="tm">${s[0].length>8?'':s[0]}</span><span>${s[1]}${s[0].length>8?`<br><small class="tm">${s[0]}</small>`:''}</span><span class="chip">${s[2]}</span></div>`).join('')
+  +`<div class="kicker">Completed · ${stats.jobs} today</div>`+doneJobs.slice(0,14).map(j=>`<div class="sched"><span class="tm">${j.t}</span><span>${j.what}<br><small class="tm">${j.name}</small></span><span class="chip ok">done</span></div>`).join('');
+}
+function reportsHTML(){
+  const pct=Math.round(stats.ai/Math.max(1,stats.msgs)*100);
+  return `<div class="kpis">
+    <div class="kpi"><b>${stats.msgs}</b><span>Messages today</span></div>
+    <div class="kpi"><b>${pct}%</b><span>Solved by AI</span></div>
+    <div class="kpi"><b>${stats.bookings}</b><span>Studio bookings</span></div>
+    <div class="kpi"><b>${stats.docs||0}</b><span>Records created</span></div>
+    <div class="kpi"><b>${stats.jobs}</b><span>Robot jobs run</span></div>
+    <div class="kpi"><b>${stats.resp[6]}s</b><span>Avg reply time</span></div>
+    <div class="kpi"><b>$13.40</b><span>AI cost this month</span></div>
+    <div class="kpi"><b>$0</b><span>Servers · free tier</span></div>
+  </div>
+  <div class="kicker">Messages by hour · today</div><canvas class="chart" id="cHour" height="150"></canvas>
+  <div class="kicker">Who answered</div><canvas class="chart" id="cDonut" height="150"></canvas>
+  <div class="kicker">Channels</div><canvas class="chart" id="cCh" height="130"></canvas>
+  <div class="kicker">Last 7 days</div><canvas class="chart" id="cWeek" height="140"></canvas>
+  <p class="foot">Illustrative activity. No customer data, names, numbers or amounts.</p>`;
+}
+function sizeCanvas(c){ const w=c.clientWidth, h=+c.getAttribute('height'); const dpr=Math.min(devicePixelRatio,2); c.width=w*dpr; c.height=h*dpr; c.style.height=h+'px'; const g=c.getContext('2d'); g.scale(dpr,dpr); return [g,w,h]; }
+function drawCharts(){
+  const hc=document.getElementById('cHour'); if(!hc) return;
+  { const [g,w,h]=sizeCanvas(hc); const pad=[26,10,22,10]; const max=Math.max(...stats.hourly,5); const cur=nowUae().getUTCHours(); const bw=(w-pad[0]-pad[1])/24;
+    g.strokeStyle='#1f2934'; g.fillStyle='#6b7a8a'; g.font='10px "IBM Plex Mono", monospace'; g.textAlign='right';
+    [0,.5,1].forEach(f=>{ const y=h-pad[2]-(h-pad[2]-pad[3])*f; g.beginPath(); g.moveTo(pad[0],y); g.lineTo(w-pad[1],y); g.stroke(); g.fillText(Math.round(max*f),pad[0]-4,y+3); });
+    stats.hourly.forEach((v,i)=>{ const bh=(h-pad[2]-pad[3])*v/max; g.fillStyle=i===cur?'#ffb454':'#5fe3d9'; g.globalAlpha=i>cur?.15:1; g.fillRect(pad[0]+i*bw+1,h-pad[2]-bh,bw-2,bh); g.globalAlpha=1; });
+    g.textAlign='center'; g.fillStyle='#6b7a8a'; [0,6,12,18,23].forEach(i=>g.fillText(String(i).padStart(2,'0'),pad[0]+i*bw+bw/2,h-6)); }
+  { const [g,w,h]=sizeCanvas(document.getElementById('cDonut')); const cx=70,cy=h/2,r=52; const a=stats.ai/Math.max(1,stats.msgs);
+    g.lineWidth=16; g.strokeStyle='#26313d'; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.stroke();
+    g.strokeStyle='#5fe3d9'; g.beginPath(); g.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*a); g.stroke();
+    g.strokeStyle='#ffb454'; g.beginPath(); g.arc(cx,cy,r,-Math.PI/2+Math.PI*2*a+.04,Math.PI*1.5-.04); g.stroke();
+    g.fillStyle='#e9eef3'; g.textAlign='center'; g.font='700 22px "Bricolage Grotesque", sans-serif'; g.fillText(Math.round(a*100)+'%',cx,cy+4); g.font='10px "IBM Plex Mono", monospace'; g.fillStyle='#8796a6'; g.fillText('AI',cx,cy+20);
+    g.textAlign='left'; g.font='12px "IBM Plex Mono", monospace';
+    [['#5fe3d9','Answered by AI',stats.ai],['#ffb454','Handed to the team',stats.team]].forEach(([c,t,v],i)=>{ g.fillStyle=c; g.fillRect(150,cy-22+i*30,10,10); g.fillStyle='#c7d1db'; g.fillText(`${t}`,168,cy-13+i*30); g.fillStyle='#8796a6'; g.fillText(String(v),168,cy+2+i*30); }); }
+  { const [g,w,h]=sizeCanvas(document.getElementById('cCh')); const tot=Object.values(stats.ch).reduce((a,b)=>a+b,0)||1; g.font='11px "IBM Plex Mono", monospace';
+    CH.forEach(([n,c],i)=>{ const v=stats.ch[n]||0; const y=14+i*28; g.fillStyle='#c7d1db'; g.textAlign='left'; g.fillText(n,10,y+9); const x0=96, bw=(w-x0-44)*v/tot; g.fillStyle='#1c2631'; g.fillRect(x0,y,w-x0-44,12); g.fillStyle=c; g.fillRect(x0,y,bw,12); g.fillStyle='#8796a6'; g.textAlign='right'; g.fillText(String(v),w-8,y+10); }); }
+  { const [g,w,h]=sizeCanvas(document.getElementById('cWeek')); const d=[...stats.week.slice(0,6),stats.msgs]; const max=Math.max(...d)*1.15; const pad=[10,10,22,14];
+    const X=i=>pad[0]+i*(w-pad[0]-pad[1])/6, Y=v=>h-pad[2]-(h-pad[2]-pad[3])*v/max;
+    g.beginPath(); d.forEach((v,i)=>i?g.lineTo(X(i),Y(v)):g.moveTo(X(i),Y(v))); g.lineTo(X(6),h-pad[2]); g.lineTo(X(0),h-pad[2]); g.closePath(); const gr=g.createLinearGradient(0,0,0,h); gr.addColorStop(0,'rgba(95,227,217,.35)'); gr.addColorStop(1,'rgba(95,227,217,0)'); g.fillStyle=gr; g.fill();
+    g.beginPath(); d.forEach((v,i)=>i?g.lineTo(X(i),Y(v)):g.moveTo(X(i),Y(v))); g.strokeStyle='#5fe3d9'; g.lineWidth=2; g.stroke();
+    g.fillStyle='#ffb454'; g.beginPath(); g.arc(X(6),Y(d[6]),4,0,Math.PI*2); g.fill();
+    const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; const today=(nowUae().getUTCDay()+6)%7; g.fillStyle='#6b7a8a'; g.font='10px "IBM Plex Mono", monospace'; g.textAlign='center';
+    for(let i=0;i<7;i++) g.fillText(i===6?'Today':days[(today-6+i+7)%7],X(i),h-6); }
+}
+let lastDraw=0;
+function refresh(force){ if(!tab) return; const now=performance.now(); if(!force&&(now-lastDraw<(tab==='Workers'?60000:tab==='Infra'?2500:700))) return; lastDraw=now;
+  const sc=dBody.scrollTop;
+  dBody.innerHTML=tab==='Inbox'?inboxHTML():tab==='Jobs'?jobsHTML():tab==='Infra'?infraHTML():reportsHTML();
+  if(tab==='Reports') drawCharts(); dBody.scrollTop=sc; }
+
+// info card
+const card=document.getElementById('card');
+function show(info){ if(!info){ card.hidden=true; return; } card.hidden=false;
+  card.innerHTML=`<button aria-label="Close">×</button><div class="kind">${info.kind}</div><h3>${info.name}</h3><p>${info.job||info.p}${info.job&&!info.wander?`<br><br><b>Now:</b> ${info.state==='sleep'?'asleep on its pad':(info.task||'working')}`:''}</p>`;
+  card.querySelector('button').onclick=()=>card.hidden=true; }
+const ray=new T.Raycaster(), mouse=new T.Vector2(); let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
+renderer.domElement.addEventListener('pointerup',e=>{ if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6||document.body.classList.contains('film')) return; mouse.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1); ray.setFromCamera(mouse,camera); const hit=ray.intersectObjects(pickables,false)[0]; show(hit?hit.object.userData.info:null); });
+
+// speed + film
+const sp={sp1:1,sp60:60,sp600:600};
+Object.keys(sp).forEach(id=>document.getElementById(id).addEventListener('click',()=>{ speed=sp[id]; Object.keys(sp).forEach(k=>document.getElementById(k).setAttribute('aria-pressed',String(k===id))); if(id==='sp1'){ sim=Date.now(); lastMin=Math.floor(sim/60000);} }));
+function film(on){ document.body.classList.toggle('film',on); document.getElementById('exitFilm').hidden=!on; document.getElementById('wm').hidden=!on; document.getElementById('bFilm').setAttribute('aria-pressed',String(on)); controls.autoRotate=on; if(on){ card.hidden=true; } }
+document.getElementById('bFilm').addEventListener('click',()=>film(true));
+document.getElementById('exitFilm').addEventListener('click',()=>film(false));
+addEventListener('keydown',e=>{ if(e.key==='Escape') film(false); });
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); refresh(true); });
+
+// ---------------- loop ----------------
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clock=new T.Clock(); let uiT=0;
+const night=new T.Color('#0b1016'), day=new T.Color('#253649');
+const tEl=document.getElementById('time');
+{ const u=nowUae(); initStats(Math.floor(sim/86400000+4/24), u.getUTCHours()); }
+for(let i=0;i<8;i++){ const [t,c,a]=pick(ACT_TYPES); ACT.push({t:hhmm(new Date(sim-(i+1)*180000+4*3600000)),type:t,color:c,area:a}); }
+// seed an inbox so panels open full
+[['Inspector','Hourly health check: all green','#6aa8ff'],['Librarian','Catalogue synced','#ffb454'],['Sweeper','Checked waiting chats','#9aa7b4'],['Cashier','Tabby payment verified','#3bffc1']].forEach(([n,w,c],i)=>doneJobs.push({t:hhmm(new Date(sim-(i+1)*420000+4*3600000)),name:n,what:w,color:c}));
+
+function frame(){
+  const dt=Math.min(clock.getDelta(),.1), now=clock.elapsedTime;
+  sim+=dt*1000*speed;
+  const curMin=Math.floor(sim/60000);
+  if(curMin>lastMin){ for(let m=Math.max(lastMin+1,curMin-30);m<=curMin;m++) tickMinute(m*60000); lastMin=curMin; }
+  const u=nowUae(); const dayKey=Math.floor(sim/86400000+4/24); if(dayKey!==statsDay){ initStats(dayKey,u.getUTCHours()); }
+  realtimeEvents(dt); recordEvents(dt);
+  const hr=u.getUTCHours()+u.getUTCMinutes()/60; const k=Math.max(0,Math.sin((hr-6)/12*Math.PI));
+  scene.background.copy(night).lerp(day,k); scene.fog.color.copy(scene.background); sun.intensity=.35+.75*k; hemi.intensity=.3+.35*k;
+
+  for(const r of robots){
+    if(isOff(r)){ r.wasOff=true; r.z.visible=false; r.eyeM.color.set('#ff3b3b'); r.bulbM.color.set('#3a1a1e'); r.head.rotation.x=.5; r.head.position.y=1.18; r.armL.rotation.x=r.armR.rotation.x=0; continue; }
+    if(r.wasOff){ r.wasOff=false; if(r.wander){ r.state='go'; r.pts=[r.route[r.wp]]; r.pi=0; } else if(r.state!=='sleep'){ r.state='back'; r.pts=[r.home.clone()]; r.pi=0; } }
+    if(r.state==='go'||r.state==='back'){
+      const tgt=r.pts[r.pi], pos=r.g.position, dir=tgt.clone().sub(pos), dist=dir.length(), step=(r.wander?2.2:3.4)*dt;
+      if(dist<=step){ pos.copy(tgt); r.pi++; if(r.pi>=r.pts.length){ if(r.wander){ r.state='work'; r.work=1+Math.random()*2.5; } else r.state=(r.state==='go')?'work':'sleep'; } }
+      else { pos.add(dir.multiplyScalar(step/dist)); r.g.rotation.y=Math.atan2(dir.x,dir.z); }
+    } else if(r.state==='work'){ r.work-=dt; if(r.work<=0){ if(r.wander){ r.wp=(r.wp+1)%r.route.length; r.pts=[r.route[r.wp]]; r.pi=0; r.state='go'; } else { r.state='back'; r.pi=0; r.pts=[...r.route].reverse().slice(1).concat([r.home.clone()]); } } }
+    const sleeping=r.state==='sleep'; const bob=reduce?0:Math.sin(now*7+r.ph)*.05;
+    if(sleeping){ r.eyeM.color.set('#28313b'); r.bulbM.color.set('#2a3038'); r.head.rotation.x=.35; r.head.position.y=1.2; r.armL.rotation.x=r.armR.rotation.x=0; r.g.rotation.y*=.95; r.z.visible=true; const zt=(now*.6+r.ph)%1; r.z.position.set(r.g.position.x+.35,2.1+(reduce?0:zt*.7),r.g.position.z); r.z.material.opacity=reduce?1:1-zt; }
+    else { r.z.visible=false; r.eyeM.color.set('#7ff7ee'); r.bulbM.color.set(Math.sin(now*8+r.ph)>0?r.color:'#ffffff'); r.head.rotation.x=0; r.head.position.y=1.28+bob;
+      const walking=r.state!=='work'; const sw=reduce?0:Math.sin(now*(walking?10:9)+r.ph)*(walking?.6:.9);
+      r.armL.rotation.x=sw; r.armR.rotation.x=-sw; if(r.state==='work'&&!reduce&&!r.carry) r.g.rotation.y+=dt*1.2; }
+  }
+  for(const l of leds){ const on=reduce?1:(.45+.55*(Math.sin(now*l.sp+l.ph)>0?1:.35)); l.m.material.color.copy(l.c).multiplyScalar(on); }
+  for(const s of screens){ const f=reduce?1:.8+.2*Math.sin(now*2+s.ph); s.s.material.color.copy(s.c).multiplyScalar(f); }
+  for(const pp of pipes){ const on=!pp.owner||W[pp.owner]; for(const q of pp.pulses){ q.m.visible=on; if(!on) continue; if(!reduce) q.t=(q.t+dt*pp.speed/pp.len)%1; q.m.position.copy(pp.path.getPointAt(q.t)); q.m.rotation.y+=dt*2; } }
+  for(let i=flyers.length-1;i>=0;i--){ const f=flyers[i]; f.t+=dt/f.dur;
+    if(f.m){ const t=Math.min(f.t,1); f.m.position.lerpVectors(f.from,f.to,t); f.m.position.y+=Math.sin(t*Math.PI)*3; f.m.rotation.y+=dt*5; if(f.t>=1){ scene.remove(f.m); flyers.splice(i,1); f.onDone&&f.onDone(); } }
+    else { f.line.material.opacity=Math.max(0,1-f.t); if(f.t>=1){ scene.remove(f.line); flyers.splice(i,1);} } }
+  holo.visible=W.akmpay; for(const v of INFRA){ v.lamp.material.color.set(infraStatus(v)==='ok'?'#7bd88f':infraStatus(v)==='warn'?'#ffb454':'#ff3b3b'); if(v.spin&&!reduce) v.spin.rotation.y+=dt; }
+  if(!reduce){ holo.rotation.y+=dt*.5; holo.children.forEach((c,i)=>c.rotation.z+=dt*(.3+i*.2)); core.rotation.x+=dt*.7;
+    window._load.position.y=13.4+Math.sin(now*.6)*1.2; window._arrow.position.y=3.6+((now*1.2)%1)*1.2; window._dish.rotation.y+=dt*.6;
+    window._spark.intensity=Math.random()<.15?3:0; window._studioLight.intensity=1+Math.sin(now*4)*.6;
+    window._siteBars.forEach((b,i)=>{ const hgt=W.website?.4+Math.abs(Math.sin(now*1.3+i))*2.2:.1; b.scale.y=hgt; b.position.y=.7+hgt/2; });
+    window._paper.position.z=21.3+((now*.8)%1)*.6; }
+  uiT+=dt; if(uiT>.3){ uiT=0; tEl.textContent=hhmm(u)+(speed>1?' ×'+speed:''); refresh(); }
+  controls.update(); renderer.render(scene,camera); requestAnimationFrame(frame);
+}
+setTimeout(()=>incoming(CH[0]),800);
+frame();
+} catch(err){ const c=document.getElementById('card'); c.hidden=false; c.innerHTML='<h3>3D view could not start</h3><p>'+String(err&&err.message||err)+'</p>'; }
+})();
+</script>
+</body>
+</html>
