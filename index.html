@@ -585,7 +585,8 @@ const jobDefs=[
   ['inspector','Inspector','#6aa8ff','Every hour: tests every AI brain and channel and updates the health board.',[V(4,6.2)]],
   ['librarian','Librarian','#ffb454','Every 6 hours: syncs the product catalogue from the website.',[V(-9,0),V(-12,0),V(-17,.8)]],
   ['analyst','Night analyst','#b5e86a','Every morning: reads yesterday\'s chats and learns new facts from the team\'s replies.',[V(0,-7),V(0,-10),V(8,-12),V(12,-10),V(16,-12.5)]],
-  ['reporter','Reporter','#ff7ac6','Every Friday morning: counts the week and emails the owner a report.',[V(5,21.3)]],
+  ['reporter','Reporter','#ff7ac6','Every Friday at 6:30: counts the week and emails the owner a report. A failed send retries the next hour.',[V(5,21.3)]],
+  ['followup','Follow-up clerk','#ffd166','Every morning at 8:30: emails and WhatsApps the list of chats still waiting on a reply. Nothing pending, nothing sent.',[V(0,12.8),V(5,21.3)]],
   ['doorman','Doorman','#c9d1d9','Answers health checks and reports if any service is down.',[V(0,20.8)]],
 ];
 jobDefs.forEach(([id,name,color,job,route],i)=>{ R[id]=makeRobot({id,name,color,job,kind:'AKM Music · akm-pay robot',home:V(-8.2+i*1.5,-6.3),route,pad:true,owner:'akmpay'}); });
@@ -689,7 +690,8 @@ function payment(){ if(!W.akmpay) return; const which=Math.random()<.6?'Tabby':'
 function tickMinute(ms){
   const d=new Date(ms), m=d.getUTCMinutes(), h=d.getUTCHours();
   if(m%5===0) wake(R.sweeper,'Checked waiting chats');
-  if(m===0){ wake(R.inspector,'Hourly health check: all green'); if(h%6===2) wake(R.librarian,'Catalogue synced'); if(h===2){ wake(R.analyst,'Learned 4 new facts'); if(d.getUTCDay()===5) setTimeout(()=>{ wake(R.reporter,'Weekly report emailed'); toast('Reporter','Weekly report emailed to the owner','#ff7ac6'); },1200); } }
+  if(m===0){ wake(R.inspector,'Hourly health check: all green'); if(h%6===2) wake(R.librarian,'Catalogue synced'); if(h===2) wake(R.analyst,'Learned 4 new facts'); }
+  if(m===30){ if(h===2&&d.getUTCDay()===5){ wake(R.reporter,'Weekly report emailed'); toast('Reporter','Weekly report emailed to the owner','#ff7ac6'); } if(h===4){ wake(R.followup,'Waiting-on-us list sent'); toast('Follow-up clerk','Chats waiting on a reply sent to the owner','#ffd166'); } }
 }
 
 let nextAct=1.5;
@@ -764,7 +766,7 @@ function jobsHTML(){
   const running=robots.filter(r=>!r.wander&&r.state!=='sleep');
   const u=nowUae(), mins=u.getUTCHours()*60+u.getUTCMinutes();
   const next5=5-(mins%5); const nextH=60-(u.getUTCMinutes());
-  const sched=[['every 5 min','Sweeper · waiting chats & lines',`in ${next5} min`],['hourly','Inspector · health check',`in ${nextH} min`],['06:00','Night analyst · daily learning',mins>=360?'done':'upcoming'],['06:00, 12:00, 18:00, 00:00','Librarian · catalogue sync','4× a day'],['Fri 06:00','Reporter · weekly email',u.getUTCDay()===5&&mins>=360?'sent':'Friday']];
+  const sched=[['every 5 min','Sweeper · waiting chats & lines',`in ${next5} min`],['hourly','Inspector · health check',`in ${nextH} min`],['06:00','Night analyst · daily learning',mins>=360?'done':'upcoming'],['06:00, 12:00, 18:00, 00:00','Librarian · catalogue sync','4× a day'],['08:30','Follow-up clerk · waiting-on-us list',mins>=510?'done':'upcoming'],['Fri 06:30','Reporter · weekly email',u.getUTCDay()===5&&mins>=390?'sent':'Friday']];
   return `<div class="kicker">Running now · ${running.length}</div>`+(running.length?running.map(r=>`<div class="job"><div><b>${r.name}</b><br><small>${r.task||'working'}</small></div><small>${r.state==='work'?'working':'on the way'}</small><div class="bar"><i style="width:${r.state==='work'?Math.round((1-r.work/(r.dur||3))*100):8}%;background:${r.color}"></i></div></div>`).join(''):'<p class="foot">All robots are resting.</p>')
   +`<div class="kicker">Scheduled</div>`+sched.map(s=>`<div class="sched"><span class="tm">${s[0].length>8?'':s[0]}</span><span>${s[1]}${s[0].length>8?`<br><small class="tm">${s[0]}</small>`:''}</span><span class="chip">${s[2]}</span></div>`).join('')
   +`<div class="kicker">Completed · ${stats.jobs} today</div>`+doneJobs.slice(0,14).map(j=>`<div class="sched"><span class="tm">${j.t}</span><span>${j.what}<br><small class="tm">${j.name}</small></span><span class="chip ok">done</span></div>`).join('');
