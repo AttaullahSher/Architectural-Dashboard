@@ -1,13 +1,10 @@
-# Architectural Dashboard
+# AKM HQ
 
-An interactive 3D map of the systems behind **AKM Music**, **Hkula**, **The Anfal** and **Asher's Lab**.
+This repository used to hold a public 3D dashboard with simulated figures. There is now one
+dashboard, and it is private: **AKM HQ**, a live view inside the AKM CRM, behind its sign-in.
 
-- **Offices**: each app is a room (website, POS, CRM, docs, repair works, practice studio, records vault).
-- **Robot workers**: each job of the automation worker is a robot that sleeps until a message, a payment or its clock wakes it.
-- **Cloud district**: Cloudflare, Firebase, Firestore, GitHub, Oracle Cloud and Render, with status and capacity.
-- **Panels**: Live activity, Today's jobs, Reports (charts), Infrastructure.
-- **Film mode**: hides the controls and slowly orbits the campus, for screen recording.
+Open it at **https://crm.akm-music.com/hq**.
 
-All activity and usage figures are simulated for display. No customer data, keys or real phone numbers are included.
-
-Open `index.html` in a browser, or visit the GitHub Pages site for this repository.
+The page published from this repository is only a door to that address. It holds no data, no
+figures and no description of the systems. The dashboard's code lives in the AKM-CRM repository
+(`src/components/hq/`).
